@@ -1,0 +1,15 @@
+export const darkMapStyle = [
+  { elementType: "geometry", stylers: [{ color: "#121417" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#8E8A82" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#121417" }] },
+  { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#2A2E33" }] },
+  { featureType: "poi", stylers: [{ visibility: "off" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#151A17" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#2A2E33" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#121417" }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9A958C" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#3C4248" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0C1C22" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#6E8B91" }] },
+];

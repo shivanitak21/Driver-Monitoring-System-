@@ -1,0 +1,214 @@
+import { useEffect, useState } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { AppText } from "@/components/ui/AppText";
+import { Button } from "@/components/ui/Button";
+import { Glass } from "@/components/ui/Glass";
+import { theme } from "@/constants/theme";
+import { useRideStore } from "@/stores/useRideStore";
+import { Image } from "expo-image";
+import { vehiclePhotos } from "@/data/photos";
+
+export function CallOverlay() {
+  const call = useRideStore((state) => state.call);
+  const patchCall = useRideStore((state) => state.patchCall);
+  const endCall = useRideStore((state) => state.endCall);
+  const [cameraPermission, requestCamera] = useCameraPermissions();
+  const [micPermission, requestMic] = useMicrophonePermissions();
+  const insets = useSafeAreaInsets();
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(() => {
+    if (call?.phase !== "live" || !call.startedAt) return;
+    const id = setInterval(() => {
+      setSeconds(Math.floor((Date.now() - (call.startedAt ?? Date.now())) / 1000));
+    }, 500);
+    return () => clearInterval(id);
+  }, [call?.phase, call?.startedAt]);
+
+  useEffect(() => {
+    if (call?.phase !== "ringing") return;
+    const id = setTimeout(() => {
+      patchCall({ phase: "live", startedAt: Date.now() });
+    }, 1200);
+    return () => clearTimeout(id);
+  }, [call?.phase, patchCall]);
+
+  if (!call) return null;
+
+  const clock = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+
+  const allowHardware = async () => {
+    if (call.mode === "video") {
+      const camera = cameraPermission?.granted ? cameraPermission : await requestCamera();
+      const mic = micPermission?.granted ? micPermission : await requestMic();
+      if (!camera.granted || !mic.granted) {
+        patchCall({ phase: "denied", hardware: false });
+        return;
+      }
+    } else {
+      const mic = micPermission?.granted ? micPermission : await requestMic();
+      if (!mic.granted) {
+        patchCall({ phase: "denied", hardware: false });
+        return;
+      }
+    }
+    patchCall({ phase: "ringing", hardware: true });
+  };
+
+  return (
+    <View style={[styles.overlay, { paddingTop: insets.top + 12 }]} testID="call-overlay">
+      <View style={styles.remote}>
+        {call.mode === "video" ? (
+          <Image source={vehiclePhotos[1].source} style={StyleSheet.absoluteFill} contentFit="cover" />
+        ) : (
+          <View style={styles.audioField} />
+        )}
+        <View style={styles.scrim} />
+        <AppText variant="label" style={styles.kicker}>
+          Simulated {call.mode} · Arun Deshpande
+        </AppText>
+        <AppText variant="display">{call.phase === "live" ? clock : call.phase}</AppText>
+        <AppText variant="body" style={styles.note}>
+          {call.hardware
+            ? "This phone’s permission is granted. The far side is still a simulated ride, not the vehicle."
+            : "The other side of this call is simulated. Hardware is used only after you allow it."}
+        </AppText>
+        {call.mode === "video" && call.hardware && call.phase === "live" ? (
+          <View style={styles.local}>
+            <CameraView style={styles.camera} facing="front" />
+          </View>
+        ) : null}
+      </View>
+
+      {call.phase === "requesting" ? (
+        <Glass style={styles.panel} padded>
+          <AppText variant="strong">Allow {call.mode === "video" ? "camera and microphone" : "microphone"}</AppText>
+          <AppText variant="body">
+            VMS asks before any live check. You can also continue with a fully simulated call.
+          </AppText>
+          <Button testID="call-allow" label="Allow and connect" onPress={() => void allowHardware()} />
+          <Button
+            label="Continue simulated"
+            tone="ghost"
+            onPress={() => patchCall({ phase: "ringing", hardware: false })}
+          />
+        </Glass>
+      ) : null}
+
+      {call.phase === "denied" ? (
+        <Glass style={styles.panel} padded>
+          <AppText variant="title">Permission denied</AppText>
+          <AppText variant="body">
+            The microphone{call.mode === "video" ? " or camera" : ""} stayed off. You can still place the simulated call.
+          </AppText>
+          <Button label="Continue simulated" onPress={() => patchCall({ phase: "ringing", hardware: false })} />
+          <Button label="Close" tone="ghost" onPress={endCall} />
+        </Glass>
+      ) : null}
+
+      {call.phase === "ringing" || call.phase === "live" ? (
+        <View style={styles.controls}>
+          <Pressable
+            testID="call-mute"
+            onPress={() => patchCall({ muted: !call.muted })}
+            style={styles.round}
+          >
+            <AppText variant="caption">{call.muted ? "Muted" : "Mute"}</AppText>
+          </Pressable>
+          <Pressable testID="call-end" onPress={endCall} style={[styles.round, styles.end]}>
+            <AppText variant="strong" style={styles.endLabel}>
+              End
+            </AppText>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {call.phase === "ended" ? (
+        <AppText variant="body" style={styles.ended}>
+          Call ended
+        </AppText>
+      ) : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: theme.bg,
+    zIndex: 40,
+    padding: 16,
+    gap: 16,
+  },
+  remote: {
+    flex: 1,
+    borderRadius: 28,
+    overflow: "hidden",
+    backgroundColor: "#14171B",
+    padding: 20,
+    justifyContent: "flex-end",
+    gap: 8,
+  },
+  audioField: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "#121418",
+  },
+  scrim: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(7,8,10,0.45)",
+  },
+  kicker: {
+    color: theme.lime,
+  },
+  note: {
+    maxWidth: 320,
+  },
+  local: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    width: 96,
+    height: 140,
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: theme.line,
+  },
+  camera: {
+    flex: 1,
+  },
+  panel: {
+    gap: 10,
+  },
+  controls: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 16,
+    marginBottom: 12,
+  },
+  round: {
+    minWidth: 84,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.bgRaised,
+    borderWidth: 1,
+    borderColor: theme.line,
+    paddingHorizontal: 16,
+  },
+  end: {
+    backgroundColor: theme.danger,
+    borderColor: theme.danger,
+  },
+  endLabel: {
+    color: "#1A0907",
+  },
+  ended: {
+    textAlign: "center",
+    marginBottom: 24,
+  },
+});
