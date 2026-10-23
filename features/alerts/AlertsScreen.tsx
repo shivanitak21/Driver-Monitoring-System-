@@ -52,7 +52,7 @@ export function AlertsScreen() {
     >
       {offline ? (
         <View style={styles.offline}>
-          <ScreenState kind="offline" title="Alerts are local" body="These events are the simulated timeline stored on this phone." />
+          <ScreenState kind="offline" title="Alerts are on this phone" body="The list stays available without a connection." />
         </View>
       ) : null}
       <View style={styles.filters}>
@@ -62,7 +62,7 @@ export function AlertsScreen() {
         <ScreenState
           kind="empty"
           title="Nothing here"
-          body="Open events appear as the simulated ride progresses."
+          body="Open events show up as the ride continues."
           actionLabel="Show all"
           onAction={() => setFilter("all")}
         />

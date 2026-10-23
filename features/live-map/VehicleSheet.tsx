@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/Button";
 import { vehiclePhotos } from "@/data/photos";
 import { vehicleProfile } from "@/data/fleet";
 import { theme } from "@/constants/theme";
-import { services } from "@/services/createServices";
 import { useRideStore, useSafetyIndex } from "@/stores/useRideStore";
 
 type Props = {
@@ -40,7 +39,7 @@ export function VehicleSheet({ sheetRef }: Props) {
       handleIndicatorStyle={styles.handle}
     >
       <BottomSheetScrollView contentContainerStyle={styles.content}>
-        <AppText variant="label">Simulated vehicle record</AppText>
+        <AppText variant="label">Vehicle</AppText>
         <AppText variant="title" style={styles.name}>
           {vehicleProfile.name}
         </AppText>
@@ -69,11 +68,8 @@ export function VehicleSheet({ sheetRef }: Props) {
           <Stat label="Cabin risk" value={`${safety.risk.score}`} unit={safety.risk.severity} />
           <Stat label="Index" value={`${safety.index}`} unit={safety.status} />
         </View>
-        <AppText variant="caption">
-          Photographs are the vehicle. No illustration is used in their place. {services.gps.describe()}
-        </AppText>
         <Button
-          label="Open vehicle studio"
+          label="Vehicle details"
           onPress={() => {
             sheetRef.current?.dismiss();
             router.push(`/vehicle/${vehicleProfile.id}`);

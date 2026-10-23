@@ -51,7 +51,7 @@ export function DeviceLocationBridge() {
         );
         if (!alive) subscription.remove();
       } catch {
-        // Permission was granted, but this phone did not return a fix.
+        // Location permission can succeed without a fix.
       }
     })();
 

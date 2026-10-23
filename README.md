@@ -1,6 +1,6 @@
 # VMS
 
-Simulated vehicle and passenger safety demo for iOS and Android. The moving car, cabin view, alerts, calls, and guardian notices are generated on the phone. Nothing in the app is a live vehicle, camera, microphone, GPS tracker, or guardian service.
+Passenger safety app for iOS and Android. The ride, cabin, alerts, calls, and family notices run on the phone. There is no live vehicle, camera feed, or dispatch service behind them.
 
 ## Run
 
@@ -11,22 +11,22 @@ npm install
 npx expo start
 ```
 
-Scan the QR code with Expo Go. Press `w` for the browser preview.
+Scan the QR code with Expo Go. Press `w` for the browser.
 
 ## Map
 
-Google Maps is optional. Put a browser key in `.env` (this file is gitignored):
+Google Maps is optional. Put a browser key in `.env` (gitignored):
 
 ```bash
 GOOGLE_MAPS_API_KEY=
 ```
 
-Restart Expo after changing it. Enable **Maps JavaScript API** on that key.
+Restart Expo after changing it, and enable **Maps JavaScript API** on the key.
 
-Without a key, Android and iOS use the map bundled with Expo Go, and the browser shows a route sketch instead of Google tiles. A native store build also reads this key through the `react-native-maps` config plugin in `app.config.ts`. Do not commit the key.
+Without a key, Android and iOS use the map bundled with Expo Go. The browser draws the route without Google tiles. A store build reads the same key through the `react-native-maps` plugin in `app.config.ts`.
 
-`EXPO_PUBLIC_TELEMETRY_URL` and `EXPO_PUBLIC_MQTT_URL` stay empty. The app will not open those connections.
+Leave `EXPO_PUBLIC_TELEMETRY_URL` and `EXPO_PUBLIC_MQTT_URL` empty. This build does not open those connections.
 
-## What is stored on the phone
+## Stored on the phone
 
-Acknowledged alerts, guardians, trip notices, cabin consent, the phone-location dot, and the offline preview switch are saved locally. The simulated drive starts again each launch.
+Acknowledged alerts, guardians, trip notices, cabin consent, the phone-location dot, and the offline switch. The drive starts again each launch.

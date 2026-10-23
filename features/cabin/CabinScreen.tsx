@@ -40,7 +40,6 @@ export function CabinScreen() {
         .open({ camera: "cabin", fault })
         .then(() => {
           if (!alive) return;
-          setNote("Simulated cabin. This phone is not the vehicle camera.");
           setPhase("live");
         })
         .catch((error: Error) => {
@@ -61,7 +60,7 @@ export function CabinScreen() {
     return () => clearInterval(timer);
   }, [recording]);
 
-  const watchful = driverState === "attentive";
+  const attentive = driverState === "attentive";
 
   return (
     <Page title="Cabin">
@@ -69,14 +68,14 @@ export function CabinScreen() {
         <ScreenState
           kind="denied"
           title="Cabin monitoring is off"
-          body="Allow it to open the simulated cabin. Nothing is recorded from this phone."
+          body="Turn this on to view the cabin for the current ride."
           actionLabel="Allow cabin monitoring"
           onAction={() => setConsent(true)}
         />
       ) : null}
 
       {consent && phase === "loading" ? (
-        <ScreenState kind="loading" title="Opening the cabin" body="Loading the simulated view." />
+        <ScreenState kind="loading" title="Opening the cabin" />
       ) : null}
 
       {consent && phase === "error" ? (
@@ -88,12 +87,12 @@ export function CabinScreen() {
           <View style={styles.frame}>
             <Image source={evidenceStill} style={styles.preview} contentFit="cover" />
             <View style={styles.tag}>
-              <AppText variant="caption">{recording ? `Recording ${seconds}s` : "Simulated"}</AppText>
+              <AppText variant="caption">{recording ? `Recording ${seconds}s` : "Cabin"}</AppText>
             </View>
           </View>
           <View style={styles.row}>
-            <View style={[styles.pill, watchful ? styles.pillSafe : styles.pillRisk]}>
-              <AppText variant="strong" style={{ color: watchful ? theme.limeInk : theme.ink }}>
+            <View style={[styles.pill, attentive ? styles.pillSafe : styles.pillRisk]}>
+              <AppText variant="strong" style={{ color: attentive ? theme.limeInk : theme.ink }}>
                 {driverState}
               </AppText>
             </View>

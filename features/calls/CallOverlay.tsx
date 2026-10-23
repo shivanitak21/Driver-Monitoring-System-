@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { Glass } from "@/components/ui/Glass";
 import { theme } from "@/constants/theme";
-import { useRideStore } from "@/stores/useRideStore";
-import { Image } from "expo-image";
+import { driverProfile } from "@/data/fleet";
 import { vehiclePhotos } from "@/data/photos";
+import { useRideStore } from "@/stores/useRideStore";
 
 export function CallOverlay() {
   const call = useRideStore((state) => state.call);
@@ -68,13 +69,11 @@ export function CallOverlay() {
         )}
         <View style={styles.scrim} />
         <AppText variant="label" style={styles.kicker}>
-          Simulated {call.mode} · Arun Deshpande
+          {call.mode === "audio" ? "Audio" : "Video"} · {driverProfile.name}
         </AppText>
         <AppText variant="display">{call.phase === "live" ? clock : call.phase}</AppText>
         <AppText variant="body" style={styles.note}>
-          {call.hardware
-            ? "This phone’s permission is granted. The far side is still a simulated ride, not the vehicle."
-            : "The other side of this call is simulated. Hardware is used only after you allow it."}
+          {call.hardware ? "Using this phone on the call." : "This phone stays off the call until you allow it."}
         </AppText>
         {call.mode === "video" && call.hardware && call.phase === "live" ? (
           <View style={styles.local}>
@@ -86,12 +85,10 @@ export function CallOverlay() {
       {call.phase === "requesting" ? (
         <Glass style={styles.panel} padded>
           <AppText variant="strong">Allow {call.mode === "video" ? "camera and microphone" : "microphone"}</AppText>
-          <AppText variant="body">
-            VMS asks before any live check. You can also continue with a fully simulated call.
-          </AppText>
+          <AppText variant="body">You can use this phone, or continue without it.</AppText>
           <Button testID="call-allow" label="Allow and connect" onPress={() => void allowHardware()} />
           <Button
-            label="Continue simulated"
+            label="Continue without it"
             tone="ghost"
             onPress={() => patchCall({ phase: "ringing", hardware: false })}
           />
@@ -102,9 +99,9 @@ export function CallOverlay() {
         <Glass style={styles.panel} padded>
           <AppText variant="title">Permission denied</AppText>
           <AppText variant="body">
-            The microphone{call.mode === "video" ? " or camera" : ""} stayed off. You can still place the simulated call.
+            The {call.mode === "video" ? "camera or microphone" : "microphone"} stayed off. You can continue without it.
           </AppText>
-          <Button label="Continue simulated" onPress={() => patchCall({ phase: "ringing", hardware: false })} />
+          <Button label="Continue without it" onPress={() => patchCall({ phase: "ringing", hardware: false })} />
           <Button label="Close" tone="ghost" onPress={endCall} />
         </Glass>
       ) : null}

@@ -8,17 +8,17 @@ type Kind = "loading" | "empty" | "offline" | "denied" | "error";
 type Props = {
   kind: Kind;
   title: string;
-  body: string;
+  body?: string;
   actionLabel?: string;
   onAction?: () => void;
 };
 
 const kicker: Record<Kind, string> = {
-  loading: "Acquiring",
-  empty: "Nothing here",
+  loading: "Loading",
+  empty: "Empty",
   offline: "Offline",
   denied: "Permission",
-  error: "Interrupted",
+  error: "Error",
 };
 
 export function ScreenState({ kind, title, body, actionLabel, onAction }: Props) {
@@ -29,9 +29,11 @@ export function ScreenState({ kind, title, body, actionLabel, onAction }: Props)
       <AppText variant="title" style={styles.title}>
         {title}
       </AppText>
-      <AppText variant="body" style={styles.body}>
-        {body}
-      </AppText>
+      {body ? (
+        <AppText variant="body" style={styles.body}>
+          {body}
+        </AppText>
+      ) : null}
       {actionLabel && onAction ? (
         <Pressable onPress={onAction} style={styles.action} accessibilityRole="button">
           <AppText variant="strong" style={styles.actionLabel}>

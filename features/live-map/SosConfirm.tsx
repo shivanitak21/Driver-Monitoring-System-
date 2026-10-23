@@ -19,8 +19,7 @@ export function SosConfirm() {
         <AppText variant="label">Incident</AppText>
         <AppText variant="title">Raise SOS for this ride</AppText>
         <AppText variant="body">
-          Priya and Kabir, and any other guardian with sharing on, receive a simulated notice. The
-          ride status becomes Emergency.
+          People with sharing on are notified, and this ride is marked Emergency.
         </AppText>
         <View style={styles.row}>
           <View style={styles.flex}>

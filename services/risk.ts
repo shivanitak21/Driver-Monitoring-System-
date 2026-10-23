@@ -87,10 +87,6 @@ function severityFor(score: number): RiskSeverity {
   return "none";
 }
 
-/**
- * Same starting policy as the vehicle pipeline in DMS-CMS `risk.py`.
- * Points join one driver-monitor hold and one cabin event. They are not a validated safety model.
- */
 export function assess(
   dmsReasons: string[] | null,
   vlm: VlmReading | null,

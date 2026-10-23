@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
-// react-native-web ships without types in this SDK. The iframe host is web-only.
-// @ts-expect-error untyped module
+// @ts-expect-error react-native-web has no types in this SDK
 import { unstable_createElement } from "react-native-web";
 
 import { buildGoogleMapHtml } from "@/components/map/googleMapDocument";

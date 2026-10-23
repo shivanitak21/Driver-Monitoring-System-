@@ -33,7 +33,7 @@ export function EvidenceScreen() {
         <ScreenState
           kind="error"
           title="This evidence is not stored"
-          body="The event id does not match a simulated still on this phone."
+          body="This event is not on the phone."
         />
       </Page>
     );
@@ -45,7 +45,7 @@ export function EvidenceScreen() {
         <ScreenState
           kind="empty"
           title="No still was kept"
-          body="This event has a timeline card only. The simulated cabin did not store a frame."
+          body="This event has a timeline card only."
         />
       </Page>
     );
@@ -56,7 +56,7 @@ export function EvidenceScreen() {
       <View style={styles.frame}>
         <Image source={evidenceStill} style={styles.image} contentFit="cover" />
         <View style={styles.tag}>
-          <AppText variant="caption">Simulated still · not a live cabin camera</AppText>
+          <AppText variant="caption">{alert.locationLabel}</AppText>
         </View>
       </View>
       <View style={styles.copy}>
@@ -69,7 +69,7 @@ export function EvidenceScreen() {
         <View style={[styles.fill, { width: `${Math.round(progress * 100)}%` }]} />
       </View>
       {loading ? (
-        <ScreenState kind="loading" title="Opening the clip" body="Preparing the simulated playback timeline." />
+        <ScreenState kind="loading" title="Opening the clip" body="Getting the recording ready." />
       ) : (
         <Button
           testID="play-evidence"

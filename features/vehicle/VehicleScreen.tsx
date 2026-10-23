@@ -30,7 +30,7 @@ export function VehicleScreen() {
         <ScreenState
           kind="error"
           title="This vehicle is not enrolled"
-          body="The demo roster only includes the BMW M5 on the live ride."
+          body="Only the BMW M5 on this ride is enrolled."
         />
       </Page>
     );

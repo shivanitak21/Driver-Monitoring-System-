@@ -1,7 +1,5 @@
 import { Circle, Line, Path, Polygon, Rect, Svg } from "react-native-svg";
 
-// Lucide icon shapes (ISC). Drawn here so the app does not import the broken package barrel.
-
 type IconProps = {
   size?: number;
   color?: string;

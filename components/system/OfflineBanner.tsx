@@ -17,7 +17,7 @@ export function OfflineBanner() {
   return (
     <View style={styles.banner} testID="offline-banner">
       <AppText variant="caption" style={styles.text}>
-        Offline · simulated ride
+        Offline
       </AppText>
     </View>
   );

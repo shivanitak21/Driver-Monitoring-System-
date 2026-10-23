@@ -25,15 +25,15 @@ export function SettingsScreen() {
   return (
     <Page kicker="Phone" title="Settings" back>
       <View style={styles.card}>
-        <AppText variant="strong">Simulated ride</AppText>
+        <AppText variant="strong">On this phone</AppText>
         <AppText variant="caption">
-          The car, cabin, alerts, and guardian notices are generated on this phone. They are not a vehicle connection.
+          The ride, cabin, alerts, and family notices stay on this phone. VMS is not connected to a vehicle.
         </AppText>
       </View>
 
       <PermissionRow
         title="Location"
-        body="Optional phone dot. When allowed, the simulated loop is placed on this fix."
+        body="Shows this phone on the map and moves the route onto that fix."
         granted={Boolean(location?.granted)}
         denied={locationDenied || location?.status === "denied"}
         onRequest={() => {

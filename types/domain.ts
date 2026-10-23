@@ -53,14 +53,6 @@ export type GuardianNotice = {
   origin: DataOrigin;
 };
 
-export type ServiceTrace = {
-  id: string;
-  at: number;
-  service: "gps" | "mqtt" | "sos" | "guardian" | "cabin" | "dms" | "lvgl";
-  message: string;
-  origin: DataOrigin;
-};
-
 export type PastTrip = {
   id: string;
   originLabel: string;
@@ -91,7 +83,6 @@ export type CallSession = {
   startedAt: number | null;
   muted: boolean;
   hardware: boolean;
-  origin: "simulated";
 };
 
 export type RiskSeverity = "none" | "low" | "medium" | "high" | "critical";

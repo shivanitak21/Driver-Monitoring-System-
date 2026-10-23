@@ -10,17 +10,14 @@ const plugins: ExpoConfig["plugins"] = [
   [
     "expo-location",
     {
-      locationWhenInUsePermission:
-        "VMS uses your location only to show this phone beside the ride. The vehicle marker stays on the simulated route until a vehicle feed is connected.",
+      locationWhenInUsePermission: "VMS shows your location on the map next to the ride.",
     },
   ],
   [
     "expo-camera",
     {
-      cameraPermission:
-        "VMS uses the camera only after you allow a video call or a cabin check from this phone.",
-      microphonePermission:
-        "VMS uses the microphone only after you allow a call or cabin listening from this phone.",
+      cameraPermission: "VMS uses the camera when you start a video call.",
+      microphonePermission: "VMS uses the microphone when you start a call.",
       recordAudioAndroid: true,
     },
   ],
@@ -38,8 +35,8 @@ if (mapsKey) {
 
 const config: ExpoConfig = {
   name: "VMS",
-  slug: "VMS",
-  scheme: "VMS",
+  slug: "vms",
+  scheme: "vms",
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/icon.png",
@@ -47,18 +44,15 @@ const config: ExpoConfig = {
   backgroundColor: "#07080A",
   ios: {
     supportsTablet: true,
-    bundleIdentifier: "com.VMS.safety",
+    bundleIdentifier: "com.vms.safety",
     infoPlist: {
-      NSLocationWhenInUseUsageDescription:
-        "VMS uses your location only to show this phone beside the ride.",
-      NSCameraUsageDescription:
-        "VMS uses the camera only after you allow a video call or a cabin check from this phone.",
-      NSMicrophoneUsageDescription:
-        "VMS uses the microphone only after you allow a call or cabin listening from this phone.",
+      NSLocationWhenInUseUsageDescription: "VMS shows your location on the map next to the ride.",
+      NSCameraUsageDescription: "VMS uses the camera when you start a video call.",
+      NSMicrophoneUsageDescription: "VMS uses the microphone when you start a call.",
     },
   },
   android: {
-    package: "com.VMS.safety",
+    package: "com.vms.safety",
     predictiveBackGestureEnabled: false,
     adaptiveIcon: {
       backgroundColor: "#07080A",
@@ -78,7 +72,6 @@ const config: ExpoConfig = {
   extra: {
     telemetryUrl: process.env.EXPO_PUBLIC_TELEMETRY_URL ?? "",
     mqttUrl: process.env.EXPO_PUBLIC_MQTT_URL ?? "",
-    dataMode: "simulated",
     googleMapsApiKey: mapsKey ?? "",
   },
 };

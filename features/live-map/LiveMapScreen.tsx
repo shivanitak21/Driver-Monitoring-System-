@@ -133,7 +133,7 @@ export function LiveMapScreen() {
                 {rideMeta.passenger.name}
               </AppText>
               <AppText variant="caption" numberOfLines={1}>
-                {headline.to} · Simulated
+                {headline.status} · {headline.to}
               </AppText>
             </View>
             <ScoreRing index={safety.index} status={safety.status} size={52} />
@@ -147,7 +147,7 @@ export function LiveMapScreen() {
 
       {booting ? (
         <View style={styles.boot} testID="boot-overlay">
-          <ScreenState kind="loading" title="Finding the ride" body="Placing the simulated BMW M5." />
+          <ScreenState kind="loading" title="Finding the ride" body="BMW M5" />
         </View>
       ) : null}
     </View>

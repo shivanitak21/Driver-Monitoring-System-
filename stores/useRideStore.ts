@@ -7,7 +7,6 @@ import {
   LIVE_TRIP_ID,
   driverProfile,
   initialGuardians,
-  initialSeats,
   passenger,
 } from "@/data/fleet";
 import { DESTINATION_LABEL, ORIGIN_LABEL, labelAt, routeTotalM, sampleAt, shiftCoordinate } from "@/data/route";
@@ -16,7 +15,6 @@ import { assess, riskLine, type RiskAssessment } from "@/services/risk";
 import type {
   AlertKind,
   CallMode,
-  CallPhase,
   CallSession,
   Coordinate,
   DriverState,
@@ -24,7 +22,6 @@ import type {
   GuardianNotice,
   SafetyAlert,
   SafetyStatus,
-  ServiceTrace,
 } from "@/types/domain";
 
 const HOUR = 1000 * 60 * 60;
@@ -202,7 +199,6 @@ type RideState = {
   alerts: SafetyAlert[];
   guardians: Guardian[];
   notices: GuardianNotice[];
-  traces: ServiceTrace[];
   call: CallSession | null;
   shareLink: string | null;
   tick: (dtMs: number) => void;
@@ -225,13 +221,7 @@ type RideState = {
   startCall: (mode: CallMode) => void;
   patchCall: (patch: Partial<CallSession>) => void;
   endCall: () => void;
-  pushTrace: (trace: Omit<ServiceTrace, "id" | "at">) => void;
 };
-
-function pushTraceInto(traces: ServiceTrace[], trace: Omit<ServiceTrace, "id" | "at">) {
-  const next = [{ ...trace, id: uid("trace"), at: Date.now() }, ...traces];
-  return next.slice(0, 12);
-}
 
 function deriveMotion(distanceM: number, direction: 1 | -1) {
   const sampled = sampleAt(distanceM);
@@ -280,17 +270,8 @@ export const useRideStore = create<RideState>()(
       origin: "simulated",
     },
   ],
-  traces: [
-    {
-      id: "trace-seed",
-      at: Date.now() - 1000 * 60 * 2,
-      service: "gps",
-      message: services.gps.describe(),
-      origin: "simulated",
-    },
-  ],
   call: null,
-  shareLink: `VMS://t/${LIVE_TRIP_ID}`,
+  shareLink: `vms://trip/${LIVE_TRIP_ID}`,
   tick: (dtMs) => {
     const state = get();
     let distanceM = state.distanceM + state.direction * (state.speedKmh / 3.6) * (dtMs / 1000);
@@ -368,7 +349,7 @@ export const useRideStore = create<RideState>()(
   cancelSos: () => set({ sosPrompt: false }),
   confirmSos: async () => {
     const state = get();
-    const receipt = await services.sos.raise({
+    await services.sos.raise({
       rideId: LIVE_TRIP_ID,
       coordinate: state.position,
       passenger: passenger.name,
@@ -399,11 +380,6 @@ export const useRideStore = create<RideState>()(
         },
         ...state.notices,
       ],
-      traces: pushTraceInto(state.traces, {
-        service: "sos",
-        message: `${receipt.topic} · ${receipt.note}`,
-        origin: "simulated",
-      }),
     });
   },
   shareTrip: async () => {
@@ -417,17 +393,14 @@ export const useRideStore = create<RideState>()(
           id: uid("notice"),
           at: Date.now(),
           title: "Trip link refreshed",
-          body: `${shared.link} is visible to ${names.length} guardian${names.length === 1 ? "" : "s"}.`,
+          body: names.length
+            ? `${shared.link} shared with ${names.join(", ")}.`
+            : `${shared.link} refreshed. Nobody is sharing this ride.`,
           guardianNames: names,
           origin: "simulated",
         },
         ...state.notices,
       ],
-      traces: pushTraceInto(get().traces, {
-        service: "guardian",
-        message: `ride/${LIVE_TRIP_ID}/share · simulated`,
-        origin: "simulated",
-      }),
     });
   },
   toggleSharing: (id) =>
@@ -485,7 +458,6 @@ export const useRideStore = create<RideState>()(
         startedAt: null,
         muted: false,
         hardware: false,
-        origin: "simulated",
       },
     }),
   patchCall: (patch) => {
@@ -501,10 +473,9 @@ export const useRideStore = create<RideState>()(
       if (get().call?.phase === "ended") set({ call: null });
     }, 700);
   },
-  pushTrace: (trace) => set({ traces: pushTraceInto(get().traces, trace) }),
     }),
     {
-      name: "VMS-demo",
+      name: "vms",
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         cabinConsent: state.cabinConsent,

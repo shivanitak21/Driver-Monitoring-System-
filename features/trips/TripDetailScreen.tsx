@@ -34,7 +34,7 @@ export function TripDetailScreen() {
         <ScreenState
           kind="error"
           title="This trip is not on the phone"
-          body="The link does not match the simulated history. Return to Trips and open a listed ride."
+          body="Open a ride from the Trips list."
         />
       </Page>
     );
@@ -50,7 +50,7 @@ export function TripDetailScreen() {
   const sharing = guardians.filter((guardian) => guardian.sharing);
 
   return (
-    <Page title={live ? headline.to : past.destinationLabel} kicker={live ? "Live · simulated" : rideDate(past.startedAt)} back>
+    <Page title={live ? headline.to : past.destinationLabel} kicker={live ? "Live" : rideDate(past.startedAt)} back>
       <View style={styles.map}>
         <RideMap
           route={route}
@@ -65,7 +65,7 @@ export function TripDetailScreen() {
           onPressVehicle={() => undefined}
         />
         <View style={styles.mapTag}>
-          <AppText variant="caption">Simulated route</AppText>
+          <AppText variant="caption">Route</AppText>
         </View>
       </View>
       <View style={styles.block}>
@@ -87,7 +87,7 @@ export function TripDetailScreen() {
         Events
       </AppText>
       {tripAlerts.length === 0 ? (
-        <ScreenState kind="empty" title="No events stored" body="This simulated ride has no safety events attached." />
+        <ScreenState kind="empty" title="No events" body="Nothing has been recorded on this ride." />
       ) : (
         tripAlerts.map((alert) => (
           <View key={alert.id} style={styles.event}>

@@ -91,7 +91,7 @@ export function KeyedRideMap({
             if (message.type === "vehicle") onPressVehicle();
             if (message.type === "auth") setFailed(true);
           } catch {
-            // Ignore non-map messages from the page.
+            // Page noise, not a map event.
           }
         }}
       />

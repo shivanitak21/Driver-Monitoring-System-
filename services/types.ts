@@ -1,18 +1,4 @@
-import type { Coordinate, DataOrigin, SafetyAlert } from "@/types/domain";
-import type { RiskAssessment } from "@/services/risk";
-
-export type GpsFix = {
-  coordinate: Coordinate;
-  heading: number;
-  speedKmh: number;
-  at: number;
-  origin: DataOrigin;
-};
-
-export type GpsStream = {
-  origin: DataOrigin;
-  describe(): string;
-};
+import type { Coordinate, DataOrigin } from "@/types/domain";
 
 export type MqttPublish = {
   topic: string;
@@ -21,7 +7,6 @@ export type MqttPublish = {
 
 export type MqttGateway = {
   origin: DataOrigin;
-  describe(): string;
   publish(message: MqttPublish): Promise<{ accepted: boolean; note: string }>;
 };
 
@@ -50,54 +35,14 @@ export type CabinSession = {
   id: string;
   camera: "driver" | "cabin";
   origin: DataOrigin;
-  note: string;
 };
 
 export type CabinFeedService = {
   open(input: { camera: "driver" | "cabin"; fault: boolean }): Promise<CabinSession>;
 };
 
-export type DriverMonitorService = {
-  describe(state: string, assessment: RiskAssessment): { line: string; origin: DataOrigin };
-};
-
-export type TelemetryFrame = {
-  origin: DataOrigin;
-  speedKmh: number;
-  heading: number;
-  coordinate: Coordinate;
-  risk: RiskAssessment;
-  lvglLine: string;
-  occupiedSeats: number;
-  seatCapacity: number;
-  etaMinutes: number;
-  tripStatus: string;
-};
-
-export type VehicleTelemetryService = {
-  snapshot(frame: Omit<TelemetryFrame, "origin" | "lvglLine"> & { lvglLine: string }): TelemetryFrame;
-};
-
 export type ServiceBundle = {
-  mode: DataOrigin;
-  note: string;
-  gps: GpsStream;
-  mqtt: MqttGateway;
   sos: SosService;
   guardians: GuardianNotifier;
   cabin: CabinFeedService;
-  driver: DriverMonitorService;
-  telemetry: VehicleTelemetryService;
-};
-
-export type TraceInput = {
-  service: "gps" | "mqtt" | "sos" | "guardian" | "cabin" | "dms" | "lvgl";
-  message: string;
-  origin: DataOrigin;
-};
-
-export type AlertDraft = Omit<SafetyAlert, "id" | "at" | "acknowledged"> & {
-  id?: string;
-  at?: number;
-  acknowledged?: boolean;
 };

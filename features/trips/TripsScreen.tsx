@@ -42,7 +42,7 @@ export function TripsScreen() {
           onPressVehicle={() => router.push(`/trip/${rideMeta.tripId}`)}
         />
         <View style={styles.mapTag} pointerEvents="none">
-          <AppText variant="caption">Live · simulated</AppText>
+          <AppText variant="caption">Live</AppText>
         </View>
       </View>
 
