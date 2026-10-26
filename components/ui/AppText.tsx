@@ -1,53 +1,10 @@
-import { ReactNode } from "react";
+import { ReactNode, useMemo } from "react";
 import { StyleProp, Text, TextProps, TextStyle } from "react-native";
 
-import { font, theme } from "@/constants/theme";
+import { font } from "@/constants/theme";
+import { useTheme } from "@/providers/ThemeProvider";
 
 type Variant = "display" | "title" | "metric" | "body" | "label" | "strong" | "caption";
-
-const variants: Record<Variant, TextStyle> = {
-  display: {
-    fontFamily: font.display,
-    fontSize: 32,
-    letterSpacing: -0.8,
-    color: theme.ink,
-  },
-  title: {
-    fontFamily: font.display,
-    fontSize: 22,
-    letterSpacing: -0.4,
-    color: theme.ink,
-  },
-  metric: {
-    fontFamily: font.title,
-    fontSize: 28,
-    letterSpacing: -0.8,
-    color: theme.ink,
-  },
-  body: {
-    fontFamily: font.body,
-    fontSize: 14,
-    lineHeight: 20,
-    color: theme.inkMuted,
-  },
-  label: {
-    fontFamily: font.medium,
-    fontSize: 12,
-    letterSpacing: 0.2,
-    color: theme.inkFaint,
-  },
-  strong: {
-    fontFamily: font.strong,
-    fontSize: 15,
-    color: theme.ink,
-  },
-  caption: {
-    fontFamily: font.medium,
-    fontSize: 12,
-    lineHeight: 16,
-    color: theme.inkFaint,
-  },
-};
 
 type Props = TextProps & {
   variant?: Variant;
@@ -56,6 +13,55 @@ type Props = TextProps & {
 };
 
 export function AppText({ variant = "body", style, children, ...props }: Props) {
+  const { colors } = useTheme();
+  const variants = useMemo<Record<Variant, TextStyle>>(
+    () => ({
+      display: {
+        fontFamily: font.display,
+        fontSize: 34,
+        letterSpacing: -0.9,
+        color: colors.ink,
+      },
+      title: {
+        fontFamily: font.display,
+        fontSize: 28,
+        letterSpacing: -0.6,
+        color: colors.ink,
+      },
+      metric: {
+        fontFamily: font.title,
+        fontSize: 26,
+        letterSpacing: -0.6,
+        color: colors.ink,
+        fontVariant: ["tabular-nums"],
+      },
+      body: {
+        fontFamily: font.body,
+        fontSize: 15,
+        lineHeight: 21,
+        color: colors.inkMuted,
+      },
+      label: {
+        fontFamily: font.medium,
+        fontSize: 13,
+        letterSpacing: 0.1,
+        color: colors.inkFaint,
+      },
+      strong: {
+        fontFamily: font.strong,
+        fontSize: 16,
+        color: colors.ink,
+      },
+      caption: {
+        fontFamily: font.medium,
+        fontSize: 13,
+        lineHeight: 18,
+        color: colors.inkMuted,
+      },
+    }),
+    [colors],
+  );
+
   return (
     <Text {...props} style={[variants[variant], style]}>
       {children}

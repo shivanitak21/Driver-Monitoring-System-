@@ -1,27 +1,32 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Bell, Car, LocateFixed, Phone, Video } from "@/components/ui/icons";
+import { Bell, Car, LocateFixed, Phone, Settings, Video } from "@/components/ui/icons";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as Haptics from "expo-haptics";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
+import { useDockOffset } from "@/components/layout/DockTabBar";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
 import { RideMap } from "@/components/map/RideMap";
 import { SosButton } from "@/components/safety/SosButton";
+import { OfflineBanner } from "@/components/system/OfflineBanner";
 import { IconButton } from "@/components/ui/Button";
+import { Glass } from "@/components/ui/Glass";
 import { AppText } from "@/components/ui/AppText";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { ScreenState } from "@/components/ui/ScreenState";
-import { OfflineBanner } from "@/components/system/OfflineBanner";
-import { theme } from "@/constants/theme";
+import { useReduceMotion } from "@/hooks/useReduceMotion";
 import { timeAgo } from "@/constants/format";
 import { VEHICLE_ID } from "@/data/fleet";
 import { routeLine, shiftLine } from "@/data/route";
+import { useTheme } from "@/providers/ThemeProvider";
 import { rideMeta, tripHeadline, useRideStore, useSafetyIndex } from "@/stores/useRideStore";
 
 export function LiveMapScreen() {
   const insets = useSafeAreaInsets();
+  const dock = useDockOffset();
+  const { colors } = useTheme();
+  const reduceMotion = useReduceMotion();
   const booting = useRideStore((state) => state.booting);
   const position = useRideStore((state) => state.position);
   const heading = useRideStore((state) => state.heading);
@@ -45,8 +50,91 @@ export function LiveMapScreen() {
   const openAlerts = alerts.filter((alert) => !alert.acknowledged);
   const urgent = openAlerts.some((alert) => alert.severity === "high" || alert.severity === "critical");
   const alertPreview = openAlerts.slice(0, 3);
-
   const openVehicle = () => router.push(`/vehicle/${VEHICLE_ID}`);
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        fill: { flex: 1, backgroundColor: colors.mapBg },
+        mapHost: { flex: 1, backgroundColor: colors.mapBg },
+        top: {
+          position: "absolute",
+          left: 16,
+          right: 16,
+          flexDirection: "row",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+        },
+        livePill: {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          paddingRight: 4,
+        },
+        dot: {
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: colors.signal,
+        },
+        tools: {
+          alignItems: "flex-end",
+          gap: 10,
+        },
+        badge: {
+          position: "absolute",
+          top: -2,
+          right: -2,
+          minWidth: 16,
+          height: 16,
+          borderRadius: 8,
+          paddingHorizontal: 4,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: urgent ? colors.danger : colors.lime,
+        },
+        badgeText: {
+          color: urgent ? colors.onDanger : colors.limeInk,
+          fontSize: 10,
+        },
+        alertPanel: {
+          marginTop: 8,
+          width: 220,
+          gap: 10,
+        },
+        alertRow: { gap: 2 },
+        bannerSlot: {
+          position: "absolute",
+          left: 16,
+          right: 16,
+          bottom: dock + 168,
+        },
+        sheetHost: {
+          position: "absolute",
+          left: 16,
+          right: 16,
+          gap: 12,
+        },
+        actions: {
+          flexDirection: "row",
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          paddingHorizontal: 8,
+        },
+        action: { flex: 1, alignItems: "center", gap: 6 },
+        sheetTop: { flexDirection: "row", alignItems: "center", gap: 12 },
+        flex: { flex: 1, gap: 2 },
+        metrics: { flexDirection: "row", gap: 16, marginTop: 12 },
+        metric: { flex: 1, gap: 2 },
+        boot: {
+          ...StyleSheet.absoluteFill,
+          backgroundColor: colors.bg,
+          justifyContent: "center",
+          paddingHorizontal: 24,
+        },
+      }),
+    [colors, dock, urgent],
+  );
 
   return (
     <View style={styles.fill}>
@@ -66,48 +154,65 @@ export function LiveMapScreen() {
           />
         </MapErrorBoundary>
 
-        <View style={[styles.locate, { top: Math.min(insets.top, 48) + 8 }]}>
-          <IconButton label="Recenter on vehicle" testID="recenter" onPress={() => setFollow(true)}>
-            <LocateFixed size={18} color={follow ? theme.lime : theme.ink} strokeWidth={1.75} />
-          </IconButton>
-        </View>
-
-        <View style={[styles.alertSlot, { top: Math.min(insets.top, 48) + 8 }]}>
-          <IconButton
-            label="Alerts"
-            testID="home-alerts"
-            onPress={() => setAlertsOpen((open) => !open)}
-          >
-            <Bell size={18} color={theme.ink} strokeWidth={1.75} />
-          </IconButton>
-          {openAlerts.length > 0 ? (
-            <View style={[styles.badge, urgent && styles.badgeUrgent]}>
-              <AppText variant="caption" style={styles.badgeText}>
-                {openAlerts.length}
-              </AppText>
+        <View style={[styles.top, { top: insets.top + 8 }]}>
+          <Glass radius={22}>
+            <View style={styles.livePill}>
+              <View style={{ paddingLeft: 12, paddingVertical: 10 }}>
+                <View style={styles.dot} />
+              </View>
+              <View style={{ paddingRight: 14, paddingVertical: 8, gap: 1 }}>
+                <AppText variant="strong" style={{ fontSize: 14 }}>
+                  Live
+                </AppText>
+                <AppText variant="caption" numberOfLines={1}>
+                  {rideMeta.passenger.name}
+                </AppText>
+              </View>
             </View>
-          ) : null}
-          {alertsOpen ? (
-            <View style={styles.alertPanel}>
-              {alertPreview.length === 0 ? (
-                <AppText variant="caption">No open alerts</AppText>
-              ) : (
-                alertPreview.map((alert) => (
-                  <Pressable
-                    key={alert.id}
-                    testID={`alert-chip-${alert.kind}`}
-                    onPress={() => router.push("/alerts")}
-                    style={styles.alertRow}
-                  >
-                    <AppText variant="strong" numberOfLines={1}>
-                      {alert.title}
-                    </AppText>
-                    <AppText variant="caption">{timeAgo(alert.at)}</AppText>
-                  </Pressable>
-                ))
-              )}
+          </Glass>
+          <View style={styles.tools}>
+            <View>
+              <IconButton label="Alerts" testID="home-alerts" onPress={() => setAlertsOpen((open) => !open)}>
+                <Bell size={18} color={colors.ink} strokeWidth={1.75} />
+              </IconButton>
+              {openAlerts.length > 0 ? (
+                <View style={styles.badge}>
+                  <AppText variant="caption" style={styles.badgeText}>
+                    {openAlerts.length}
+                  </AppText>
+                </View>
+              ) : null}
             </View>
-          ) : null}
+            <IconButton label="Settings" onPress={() => router.push("/settings")}>
+              <Settings size={18} color={colors.ink} strokeWidth={1.75} />
+            </IconButton>
+            <IconButton label="Recenter on vehicle" testID="recenter" onPress={() => setFollow(true)}>
+              <LocateFixed size={18} color={follow ? colors.signal : colors.ink} strokeWidth={1.75} />
+            </IconButton>
+            {alertsOpen ? (
+              <Glass radius={18} padded>
+                <View style={styles.alertPanel}>
+                  {alertPreview.length === 0 ? (
+                    <AppText variant="caption">No open alerts</AppText>
+                  ) : (
+                    alertPreview.map((alert) => (
+                      <Pressable
+                        key={alert.id}
+                        testID={`alert-chip-${alert.kind}`}
+                        onPress={() => router.push("/alerts")}
+                        style={styles.alertRow}
+                      >
+                        <AppText variant="strong" numberOfLines={1}>
+                          {alert.title}
+                        </AppText>
+                        <AppText variant="caption">{timeAgo(alert.at)}</AppText>
+                      </Pressable>
+                    ))
+                  )}
+                </View>
+              </Glass>
+            ) : null}
+          </View>
         </View>
 
         <View style={styles.bannerSlot} pointerEvents="box-none">
@@ -115,34 +220,38 @@ export function LiveMapScreen() {
         </View>
       </View>
 
-      <Animated.View entering={FadeInDown.duration(420)} style={styles.sheetHost}>
+      <Animated.View
+        entering={reduceMotion ? undefined : FadeInDown.duration(480)}
+        style={[styles.sheetHost, { bottom: dock - 8 }]}
+      >
         <View style={styles.actions}>
-          <MapAction testID="home-vehicle" label="Vehicle" onPress={openVehicle} icon={<Car size={18} color={theme.ink} strokeWidth={1.75} />} />
-          <MapAction testID="home-video" label="Video" onPress={() => startCall("video")} icon={<Video size={18} color={theme.ink} strokeWidth={1.75} />} />
-          <MapAction testID="home-audio" label="Audio" onPress={() => startCall("audio")} icon={<Phone size={18} color={theme.ink} strokeWidth={1.75} />} />
+          <MapAction testID="home-vehicle" label="Vehicle" onPress={openVehicle} icon={<Car size={18} color={colors.ink} strokeWidth={1.75} />} />
+          <MapAction testID="home-video" label="Video" onPress={() => startCall("video")} icon={<Video size={18} color={colors.ink} strokeWidth={1.75} />} />
+          <MapAction testID="home-audio" label="Audio" onPress={() => startCall("audio")} icon={<Phone size={18} color={colors.ink} strokeWidth={1.75} />} />
           <View style={styles.action}>
             <SosButton onPress={askSos} />
-            <View style={styles.actionSpacer} />
           </View>
         </View>
 
-        <View style={styles.sheet}>
-          <View style={styles.sheetTop}>
-            <View style={styles.flex}>
-              <AppText variant="title" numberOfLines={1}>
-                {rideMeta.passenger.name}
-              </AppText>
-              <AppText variant="caption" numberOfLines={1}>
-                {headline.status} · {headline.to}
-              </AppText>
+        <Glass radius={28}>
+          <View style={{ paddingHorizontal: 16, paddingVertical: 14 }}>
+            <View style={styles.sheetTop}>
+              <View style={styles.flex}>
+                <AppText variant="title" numberOfLines={1} style={{ fontSize: 22 }}>
+                  {rideMeta.passenger.name}
+                </AppText>
+                <AppText variant="caption" numberOfLines={1}>
+                  {headline.status} · {headline.to}
+                </AppText>
+              </View>
+              <ScoreRing index={safety.index} status={safety.status} size={52} caption="Safety score" />
             </View>
-            <ScoreRing index={safety.index} status={safety.status} size={52} />
+            <View style={styles.metrics}>
+              <Metric label="ETA" value={`${eta} min`} />
+              <Metric label="Speed" value={`${speed} km/h`} />
+            </View>
           </View>
-          <View style={styles.metrics}>
-            <Metric label="ETA" value={`${eta} min`} />
-            <Metric label="Speed" value={`${speed} km/h`} />
-          </View>
-        </View>
+        </Glass>
       </Animated.View>
 
       {booting ? (
@@ -166,148 +275,22 @@ function MapAction({
   testID: string;
 }) {
   return (
-    <Pressable
-      testID={testID}
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      onPress={() => {
-        void Haptics.selectionAsync();
-        onPress();
-      }}
-      style={styles.action}
-    >
-      <View style={styles.actionIcon}>{icon}</View>
+    <View style={{ flex: 1, alignItems: "center", gap: 6 }}>
+      <IconButton testID={testID} label={label} onPress={onPress}>
+        {icon}
+      </IconButton>
       <AppText variant="caption">{label}</AppText>
-    </Pressable>
+    </View>
   );
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <View style={styles.metric}>
+    <View style={{ flex: 1, gap: 2 }}>
       <AppText variant="label">{label}</AppText>
-      <AppText variant="strong" numberOfLines={1}>
+      <AppText variant="metric" numberOfLines={1} style={{ fontSize: 22 }}>
         {value}
       </AppText>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  fill: {
-    flex: 1,
-    backgroundColor: theme.bg,
-  },
-  mapHost: {
-    flex: 1,
-    minHeight: "68%",
-    backgroundColor: theme.bg,
-  },
-  locate: {
-    position: "absolute",
-    left: 16,
-  },
-  alertSlot: {
-    position: "absolute",
-    right: 16,
-    alignItems: "flex-end",
-  },
-  badge: {
-    position: "absolute",
-    top: 2,
-    right: 2,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 4,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.lime,
-  },
-  badgeUrgent: {
-    backgroundColor: theme.danger,
-  },
-  badgeText: {
-    color: "#111111",
-    fontSize: 9,
-  },
-  alertPanel: {
-    marginTop: 8,
-    width: 210,
-    borderRadius: 16,
-    padding: 12,
-    gap: 10,
-    backgroundColor: "rgba(0,0,0,0.94)",
-    borderWidth: 1,
-    borderColor: theme.line,
-  },
-  alertRow: {
-    gap: 2,
-  },
-  bannerSlot: {
-    position: "absolute",
-    left: 16,
-    right: 72,
-    bottom: 12,
-  },
-  sheetHost: {
-    paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 8,
-    gap: 6,
-  },
-  actions: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-  },
-  action: {
-    flex: 1,
-    alignItems: "center",
-    gap: 4,
-  },
-  actionIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.bgRaised,
-    borderWidth: 1,
-    borderColor: theme.line,
-  },
-  actionSpacer: {
-    height: 16,
-  },
-  sheet: {
-    borderRadius: 20,
-    backgroundColor: theme.bgRaised,
-    borderWidth: 1,
-    borderColor: theme.line,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 8,
-  },
-  sheetTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  flex: {
-    flex: 1,
-    gap: 2,
-  },
-  metrics: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  metric: {
-    flex: 1,
-    gap: 2,
-  },
-  boot: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: theme.bg,
-    justifyContent: "center",
-  },
-});

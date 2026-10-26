@@ -14,6 +14,7 @@ import { DeviceLocationBridge, RideClock } from "@/components/system/RideRuntime
 import { theme } from "@/constants/theme";
 import { CallOverlay } from "@/features/calls/CallOverlay";
 import { SosConfirm } from "@/features/live-map/SosConfirm";
+import { ThemeProvider, useTheme } from "@/providers/ThemeProvider";
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -31,27 +32,39 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.bg }}>
       <SafeAreaProvider>
-        <BottomSheetModalProvider>
-          <StatusBar style="light" />
-          <RideClock />
-          <DeviceLocationBridge />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              animation: "slide_from_right",
-              contentStyle: { backgroundColor: theme.bg },
-            }}
-          >
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="trip/[id]" />
-            <Stack.Screen name="vehicle/[id]" />
-            <Stack.Screen name="settings" />
-            <Stack.Screen name="evidence/[id]" />
-          </Stack>
-          <SosConfirm />
-          <CallOverlay />
-        </BottomSheetModalProvider>
+        <ThemeProvider>
+          <AppFrame />
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+  );
+}
+
+function AppFrame() {
+  const { colors } = useTheme();
+
+  return (
+    <BottomSheetModalProvider>
+      <StatusBar style={colors.statusBar} />
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <RideClock />
+        <DeviceLocationBridge />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            animation: "slide_from_right",
+            contentStyle: { backgroundColor: colors.bg },
+          }}
+        >
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="trip/[id]" />
+          <Stack.Screen name="vehicle/[id]" />
+          <Stack.Screen name="settings" />
+          <Stack.Screen name="evidence/[id]" />
+        </Stack>
+        <SosConfirm />
+        <CallOverlay />
+      </View>
+    </BottomSheetModalProvider>
   );
 }

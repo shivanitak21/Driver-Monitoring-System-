@@ -7,14 +7,15 @@ import { Page } from "@/components/layout/Page";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { ScreenState } from "@/components/ui/ScreenState";
-import { theme } from "@/constants/theme";
 import { clock } from "@/constants/format";
 import { evidenceStill } from "@/data/photos";
+import { useTheme } from "@/providers/ThemeProvider";
 import { useRideStore } from "@/stores/useRideStore";
 
 export function EvidenceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const alert = useRideStore((state) => state.alerts.find((item) => item.id === id));
+  const { colors } = useTheme();
   const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -29,7 +30,7 @@ export function EvidenceScreen() {
 
   if (!alert) {
     return (
-      <Page kicker="Evidence" title="Missing still" back>
+      <Page title="Missing still" back>
         <ScreenState
           kind="error"
           title="This evidence is not stored"
@@ -41,7 +42,7 @@ export function EvidenceScreen() {
 
   if (!alert.evidenceId) {
     return (
-      <Page kicker="Evidence" title={alert.title} back>
+      <Page title={alert.title} subtitle="No still was kept" back>
         <ScreenState
           kind="empty"
           title="No still was kept"
@@ -52,21 +53,21 @@ export function EvidenceScreen() {
   }
 
   return (
-    <Page kicker="Recorded event" title={alert.title} back>
-      <View style={styles.frame}>
+    <Page title={alert.title} subtitle={`${clock(alert.at)} · ${alert.locationLabel}`} back>
+      <View style={[styles.frame, { backgroundColor: colors.bgSoft }]}>
         <Image source={evidenceStill} style={styles.image} contentFit="cover" />
-        <View style={styles.tag}>
+        <View style={[styles.tag, { backgroundColor: colors.glass }]}>
           <AppText variant="caption">{alert.locationLabel}</AppText>
         </View>
       </View>
       <View style={styles.copy}>
         <AppText variant="body">{alert.detail}</AppText>
         <AppText variant="caption">
-          {clock(alert.at)} · {alert.locationLabel} · {alert.severity}
+        {clock(alert.at)} · {alert.locationLabel} · {alert.severity}
         </AppText>
       </View>
-      <View style={styles.track}>
-        <View style={[styles.fill, { width: `${Math.round(progress * 100)}%` }]} />
+      <View style={[styles.track, { backgroundColor: colors.bgSoft }]}>
+        <View style={[styles.fill, { width: `${Math.round(progress * 100)}%`, backgroundColor: colors.signal }]} />
       </View>
       {loading ? (
         <ScreenState kind="loading" title="Opening the clip" body="Getting the recording ready." />
@@ -96,8 +97,6 @@ const styles = StyleSheet.create({
     height: 240,
     borderRadius: 24,
     overflow: "hidden",
-    marginTop: 8,
-    backgroundColor: theme.bgSoft,
   },
   image: {
     width: "100%",
@@ -107,7 +106,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 12,
     bottom: 12,
-    backgroundColor: "rgba(7,8,10,0.78)",
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -119,12 +117,10 @@ const styles = StyleSheet.create({
   track: {
     height: 4,
     borderRadius: 2,
-    backgroundColor: theme.bgSoft,
     marginBottom: 16,
     overflow: "hidden",
   },
   fill: {
     height: 4,
-    backgroundColor: theme.lime,
   },
 });

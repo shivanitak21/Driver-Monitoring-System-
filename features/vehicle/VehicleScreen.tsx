@@ -4,13 +4,14 @@ import { Image } from "expo-image";
 import { useLocalSearchParams } from "expo-router";
 
 import { Page } from "@/components/layout/Page";
+import { SeatOccupancyGrid } from "@/components/safety/SeatOccupancyGrid";
 import { AppText } from "@/components/ui/AppText";
 import { ScreenState } from "@/components/ui/ScreenState";
 import { Segmented } from "@/components/ui/Segmented";
 import { PhotoOrbit } from "@/components/vehicle/PhotoOrbit";
-import { theme } from "@/constants/theme";
 import { vehiclePhotos } from "@/data/photos";
 import { VEHICLE_ID, initialSeats, vehicleProfile } from "@/data/fleet";
+import { useTheme } from "@/providers/ThemeProvider";
 import { useRideStore, useSafetyIndex } from "@/stores/useRideStore";
 
 const exterior = vehiclePhotos[0];
@@ -21,26 +22,24 @@ export function VehicleScreen() {
   const safety = useSafetyIndex();
   const speed = useRideStore((state) => state.speedKmh);
   const heading = useRideStore((state) => state.heading);
+  const { colors } = useTheme();
   const [tab, setTab] = useState("exterior");
   const [interior, setInterior] = useState(0);
 
   if (id !== VEHICLE_ID) {
     return (
       <Page title="Unknown vehicle" back>
-        <ScreenState
-          kind="error"
-          title="This vehicle is not enrolled"
-          body="Only the BMW M5 on this ride is enrolled."
-        />
+        <ScreenState kind="error" title="This vehicle is not enrolled" body="Only the BMW M5 on this ride is enrolled." />
       </Page>
     );
   }
 
   return (
-    <Page title={vehicleProfile.name} back>
-      <AppText variant="caption">
-        {vehicleProfile.trim} · {vehicleProfile.color} · {vehicleProfile.plate}
-      </AppText>
+    <Page
+      title={vehicleProfile.name}
+      subtitle={`${vehicleProfile.trim} · ${vehicleProfile.color} · ${vehicleProfile.plate}`}
+      back
+    >
       <View style={styles.tabs}>
         <Segmented
           value={tab}
@@ -48,19 +47,19 @@ export function VehicleScreen() {
           items={[
             { id: "exterior", label: "Exterior" },
             { id: "interior", label: "Interior" },
-            { id: "model", label: "3D" },
+            { id: "model", label: "Orbit" },
           ]}
         />
       </View>
 
       {tab === "exterior" ? (
-        <View style={styles.frame}>
+        <View style={[styles.frame, { backgroundColor: colors.bgSoft }]}>
           <Image source={exterior.source} style={styles.photo} contentFit="cover" transition={180} />
         </View>
       ) : null}
 
       {tab === "interior" ? (
-        <View style={styles.frame}>
+        <View style={[styles.frame, { backgroundColor: colors.bgSoft }]}>
           <Image source={interiors[interior].source} style={styles.photo} contentFit="cover" transition={180} />
           <View style={styles.dots}>
             {interiors.map((photo, index) => (
@@ -68,7 +67,7 @@ export function VehicleScreen() {
                 key={photo.id}
                 accessibilityLabel={photo.caption}
                 onPress={() => setInterior(index)}
-                style={[styles.dot, index === interior && styles.dotOn]}
+                style={[styles.dot, { backgroundColor: index === interior ? colors.ink : "rgba(255,255,255,0.45)" }]}
               />
             ))}
           </View>
@@ -87,16 +86,10 @@ export function VehicleScreen() {
       <View style={styles.stats}>
         <Stat label="Speed" value={`${speed} km/h`} />
         <Stat label="Heading" value={`${Math.round(heading)}°`} />
-        <Stat label="Score" value={`${safety.index}`} />
+        <Stat label="Safety score" value={`${safety.index}`} />
       </View>
       <View style={styles.seats}>
-        {initialSeats.map((seat) => (
-          <View key={seat.id} style={[styles.seat, seat.occupied && styles.seatOn]}>
-            <AppText variant="caption" style={{ color: seat.occupied ? theme.limeInk : theme.inkMuted }}>
-              {seat.label}
-            </AppText>
-          </View>
-        ))}
+        <SeatOccupancyGrid seats={initialSeats} />
       </View>
     </Page>
   );
@@ -106,72 +99,21 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.stat}>
       <AppText variant="label">{label}</AppText>
-      <AppText variant="strong">{value}</AppText>
+      <AppText variant="metric" style={{ fontSize: 22 }}>
+        {value}
+      </AppText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  tabs: {
-    marginTop: 14,
-    marginBottom: 12,
-  },
-  frame: {
-    height: 360,
-    borderRadius: 20,
-    overflow: "hidden",
-    backgroundColor: theme.bgSoft,
-  },
-  photo: {
-    width: "100%",
-    height: "100%",
-  },
-  dots: {
-    position: "absolute",
-    bottom: 12,
-    alignSelf: "center",
-    flexDirection: "row",
-    gap: 8,
-  },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: "rgba(255,255,255,0.35)",
-  },
-  dotOn: {
-    backgroundColor: theme.ink,
-  },
-  model: {
-    gap: 10,
-  },
-  stats: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 16,
-  },
-  stat: {
-    flex: 1,
-    gap: 2,
-  },
-  seats: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 16,
-  },
-  seat: {
-    width: "48%",
-    minHeight: 44,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: theme.line,
-    backgroundColor: theme.bgRaised,
-  },
-  seatOn: {
-    backgroundColor: theme.lime,
-    borderColor: theme.lime,
-  },
+  tabs: { marginBottom: 14 },
+  frame: { height: 360, borderRadius: 22, overflow: "hidden" },
+  photo: { width: "100%", height: "100%" },
+  dots: { position: "absolute", bottom: 14, alignSelf: "center", flexDirection: "row", gap: 8 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  model: { gap: 10 },
+  stats: { flexDirection: "row", gap: 12, marginTop: 18 },
+  stat: { flex: 1, gap: 2 },
+  seats: { marginTop: 18 },
 });

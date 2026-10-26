@@ -3,9 +3,10 @@ import { Image, type ImageSource } from "expo-image";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
-import { theme } from "@/constants/theme";
+import { useTheme } from "@/providers/ThemeProvider";
 
 export function PhotoOrbit({ source }: { source: ImageSource }) {
+  const { colors } = useTheme();
   const yaw = useSharedValue(-12);
   const pitch = useSharedValue(6);
   const startYaw = useSharedValue(0);
@@ -33,7 +34,7 @@ export function PhotoOrbit({ source }: { source: ImageSource }) {
   }));
 
   return (
-    <View style={styles.stage}>
+    <View style={[styles.stage, { backgroundColor: colors.bgSoft }]}>
       <GestureDetector gesture={gesture}>
         <Animated.View style={[styles.card, orbit]}>
           <Image source={source} style={styles.photo} contentFit="cover" transition={180} />
@@ -46,8 +47,7 @@ export function PhotoOrbit({ source }: { source: ImageSource }) {
 const styles = StyleSheet.create({
   stage: {
     height: 360,
-    borderRadius: 20,
-    backgroundColor: theme.bgSoft,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",

@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { Glass } from "@/components/ui/Glass";
-import { theme } from "@/constants/theme";
+import { useTheme } from "@/providers/ThemeProvider";
 import { driverProfile } from "@/data/fleet";
 import { vehiclePhotos } from "@/data/photos";
 import { useRideStore } from "@/stores/useRideStore";
@@ -19,6 +19,7 @@ export function CallOverlay() {
   const [cameraPermission, requestCamera] = useCameraPermissions();
   const [micPermission, requestMic] = useMicrophonePermissions();
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const [seconds, setSeconds] = useState(0);
 
   useEffect(() => {
@@ -60,7 +61,7 @@ export function CallOverlay() {
   };
 
   return (
-    <View style={[styles.overlay, { paddingTop: insets.top + 12 }]} testID="call-overlay">
+    <View style={[styles.overlay, { paddingTop: insets.top + 12, backgroundColor: colors.bg }]} testID="call-overlay">
       <View style={styles.remote}>
         {call.mode === "video" ? (
           <Image source={vehiclePhotos[1].source} style={StyleSheet.absoluteFill} contentFit="cover" />
@@ -68,7 +69,7 @@ export function CallOverlay() {
           <View style={styles.audioField} />
         )}
         <View style={styles.scrim} />
-        <AppText variant="label" style={styles.kicker}>
+        <AppText variant="label" style={{ color: colors.signal }}>
           {call.mode === "audio" ? "Audio" : "Video"} · {driverProfile.name}
         </AppText>
         <AppText variant="display">{call.phase === "live" ? clock : call.phase}</AppText>
@@ -76,7 +77,7 @@ export function CallOverlay() {
           {call.hardware ? "Using this phone on the call." : "This phone stays off the call until you allow it."}
         </AppText>
         {call.mode === "video" && call.hardware && call.phase === "live" ? (
-          <View style={styles.local}>
+          <View style={[styles.local, { borderColor: colors.line }]}>
             <CameraView style={styles.camera} facing="front" />
           </View>
         ) : null}
@@ -111,12 +112,12 @@ export function CallOverlay() {
           <Pressable
             testID="call-mute"
             onPress={() => patchCall({ muted: !call.muted })}
-            style={styles.round}
+            style={[styles.round, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}
           >
             <AppText variant="caption">{call.muted ? "Muted" : "Mute"}</AppText>
           </Pressable>
-          <Pressable testID="call-end" onPress={endCall} style={[styles.round, styles.end]}>
-            <AppText variant="strong" style={styles.endLabel}>
+          <Pressable testID="call-end" onPress={endCall} style={[styles.round, styles.end, { backgroundColor: colors.danger, borderColor: colors.danger }]}>
+            <AppText variant="strong" style={{ color: colors.onDanger }}>
               End
             </AppText>
           </Pressable>
@@ -135,7 +136,6 @@ export function CallOverlay() {
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: theme.bg,
     zIndex: 40,
     padding: 16,
     gap: 16,
@@ -157,9 +157,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(7,8,10,0.45)",
   },
-  kicker: {
-    color: theme.lime,
-  },
   note: {
     maxWidth: 320,
   },
@@ -172,7 +169,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: theme.line,
   },
   camera: {
     flex: 1,
@@ -192,17 +188,11 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.bgRaised,
     borderWidth: 1,
-    borderColor: theme.line,
     paddingHorizontal: 16,
   },
   end: {
-    backgroundColor: theme.danger,
-    borderColor: theme.danger,
-  },
-  endLabel: {
-    color: "#1A0907",
+    borderWidth: 0,
   },
   ended: {
     textAlign: "center",

@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 
 import { Page } from "@/components/layout/Page";
+import { SeatOccupancyGrid } from "@/components/safety/SeatOccupancyGrid";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { ScreenState } from "@/components/ui/ScreenState";
-import { theme } from "@/constants/theme";
 import { evidenceStill } from "@/data/photos";
 import { initialSeats } from "@/data/fleet";
+import { useTheme } from "@/providers/ThemeProvider";
 import { services } from "@/services/createServices";
 import { useRideStore, useSafetyIndex } from "@/stores/useRideStore";
 
@@ -23,6 +24,7 @@ export function CabinScreen() {
   const askSos = useRideStore((state) => state.askSos);
   const startCall = useRideStore((state) => state.startCall);
   const safety = useSafetyIndex();
+  const { colors } = useTheme();
   const [phase, setPhase] = useState<Phase>("idle");
   const [note, setNote] = useState("");
   const [recording, setRecording] = useState(false);
@@ -61,9 +63,37 @@ export function CabinScreen() {
   }, [recording]);
 
   const attentive = driverState === "attentive";
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        stack: { gap: 14 },
+        frame: {
+          height: 320,
+          borderRadius: 22,
+          overflow: "hidden",
+          backgroundColor: colors.bgSoft,
+        },
+        preview: { width: "100%", height: "100%" },
+        tag: {
+          position: "absolute",
+          left: 12,
+          bottom: 12,
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+          borderRadius: 999,
+          backgroundColor: colors.glass,
+        },
+        row: { flexDirection: "row", alignItems: "center", gap: 10 },
+        flex: { flex: 1 },
+        pill: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 },
+        actions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+        action: { flexGrow: 1, minWidth: 96 },
+      }),
+    [colors],
+  );
 
   return (
-    <Page title="Cabin">
+    <Page title="Cabin" subtitle="Interior view for this ride">
       {!consent ? (
         <ScreenState
           kind="denied"
@@ -74,9 +104,7 @@ export function CabinScreen() {
         />
       ) : null}
 
-      {consent && phase === "loading" ? (
-        <ScreenState kind="loading" title="Opening the cabin" />
-      ) : null}
+      {consent && phase === "loading" ? <ScreenState kind="loading" title="Opening the cabin" /> : null}
 
       {consent && phase === "error" ? (
         <ScreenState kind="error" title="The cabin feed failed" body={note} actionLabel="Retry" onAction={() => setFault(false)} />
@@ -91,8 +119,8 @@ export function CabinScreen() {
             </View>
           </View>
           <View style={styles.row}>
-            <View style={[styles.pill, attentive ? styles.pillSafe : styles.pillRisk]}>
-              <AppText variant="strong" style={{ color: attentive ? theme.limeInk : theme.ink }}>
+            <View style={[styles.pill, { backgroundColor: colors.bgRaised, borderWidth: 1, borderColor: attentive ? colors.line : colors.danger }]}>
+              <AppText variant="strong" style={{ color: attentive ? colors.signal : colors.danger, textTransform: "capitalize" }}>
                 {driverState}
               </AppText>
             </View>
@@ -100,29 +128,24 @@ export function CabinScreen() {
               {safety.line}
             </AppText>
           </View>
-          <View style={styles.seats}>
-            {initialSeats.map((seat) => (
-              <View key={seat.id} style={[styles.seat, seat.occupied && styles.seatOn]}>
-                <AppText variant="caption" style={{ color: seat.occupied ? theme.limeInk : theme.inkMuted }}>
-                  {seat.label}
-                </AppText>
-                <AppText variant="strong" style={{ color: seat.occupied ? theme.limeInk : theme.ink }}>
-                  {seat.occupied ? "In" : "Empty"}
-                </AppText>
-              </View>
-            ))}
-          </View>
+          <SeatOccupancyGrid seats={initialSeats} />
           <View style={styles.actions}>
-            <Button
-              label={recording ? "Stop" : "Record"}
-              tone={recording ? "danger" : "lime"}
-              onPress={() => {
-                setRecording((value) => !value);
-                if (recording) setSeconds(0);
-              }}
-            />
-            <Button label="Video call" tone="ghost" onPress={() => startCall("video")} />
-            <Button label="Audio call" tone="ghost" onPress={() => startCall("audio")} />
+            <View style={styles.action}>
+              <Button
+                label={recording ? "Stop" : "Record"}
+                tone={recording ? "danger" : "quiet"}
+                onPress={() => {
+                  setRecording((value) => !value);
+                  if (recording) setSeconds(0);
+                }}
+              />
+            </View>
+            <View style={styles.action}>
+              <Button label="Video call" tone="ghost" onPress={() => startCall("video")} />
+            </View>
+            <View style={styles.action}>
+              <Button label="Audio call" tone="ghost" onPress={() => startCall("audio")} />
+            </View>
           </View>
           <Button label="Interrupt feed" tone="quiet" onPress={() => setFault(true)} />
           <Button label="Raise SOS" tone="danger" onPress={askSos} />
@@ -131,74 +154,3 @@ export function CabinScreen() {
     </Page>
   );
 }
-
-const styles = StyleSheet.create({
-  stack: {
-    gap: 12,
-    marginTop: 8,
-  },
-  frame: {
-    height: 320,
-    borderRadius: 20,
-    overflow: "hidden",
-    backgroundColor: theme.bgSoft,
-  },
-  preview: {
-    width: "100%",
-    height: "100%",
-  },
-  tag: {
-    position: "absolute",
-    left: 12,
-    bottom: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.72)",
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  flex: {
-    flex: 1,
-  },
-  pill: {
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  pillSafe: {
-    backgroundColor: theme.lime,
-  },
-  pillRisk: {
-    backgroundColor: theme.bgRaised,
-    borderWidth: 1,
-    borderColor: theme.danger,
-  },
-  seats: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  seat: {
-    width: "48%",
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    backgroundColor: theme.bgRaised,
-    borderWidth: 1,
-    borderColor: theme.line,
-    gap: 2,
-  },
-  seatOn: {
-    backgroundColor: theme.lime,
-    borderColor: theme.lime,
-  },
-  actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-});

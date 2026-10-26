@@ -8,8 +8,9 @@ import { Page } from "@/components/layout/Page";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { ScreenState } from "@/components/ui/ScreenState";
-import { theme } from "@/constants/theme";
+import { font } from "@/constants/theme";
 import { timeAgo } from "@/constants/format";
+import { useTheme } from "@/providers/ThemeProvider";
 import { useRideStore } from "@/stores/useRideStore";
 
 export function GuardiansScreen() {
@@ -20,17 +21,18 @@ export function GuardiansScreen() {
   const removeGuardian = useRideStore((state) => state.removeGuardian);
   const shareTrip = useRideStore((state) => state.shareTrip);
   const shareLink = useRideStore((state) => state.shareLink);
+  const { colors } = useTheme();
   const [name, setName] = useState("");
   const [relationship, setRelationship] = useState("");
   const [phone, setPhone] = useState("");
   const [formError, setFormError] = useState("");
   const [invite, setInvite] = useState(false);
-
   const sharing = guardians.filter((guardian) => guardian.sharing);
 
   return (
     <Page
       title="Family"
+      subtitle={`${sharing.length} sharing this ride`}
       action={
         <Pressable
           testID="open-settings"
@@ -40,15 +42,14 @@ export function GuardiansScreen() {
             void Haptics.selectionAsync();
             router.push("/settings");
           }}
-          style={styles.settings}
+          style={[styles.settings, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}
         >
-          <Settings size={18} color={theme.ink} strokeWidth={1.75} />
+          <Settings size={18} color={colors.ink} strokeWidth={1.75} />
         </Pressable>
       }
     >
       <View style={styles.summary}>
-        <AppText variant="title">{sharing.length} sharing</AppText>
-        <AppText variant="caption" numberOfLines={1}>
+        <AppText variant="caption" numberOfLines={2}>
           {shareLink}
         </AppText>
         <Button testID="refresh-share" label="Refresh link" tone="ghost" onPress={() => void shareTrip()} />
@@ -62,8 +63,8 @@ export function GuardiansScreen() {
         />
       ) : (
         guardians.map((guardian) => (
-          <View key={guardian.id} style={styles.profile}>
-            <View style={styles.avatar}>
+          <View key={guardian.id} style={[styles.profile, { borderTopColor: colors.line }]}>
+            <View style={[styles.avatar, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}>
               <AppText variant="strong">{initials(guardian.name)}</AppText>
             </View>
             <View style={styles.flex}>
@@ -72,21 +73,25 @@ export function GuardiansScreen() {
                 {guardian.relationship}
                 {guardian.lastNotifiedAt ? ` · ${timeAgo(guardian.lastNotifiedAt)}` : ""}
               </AppText>
-              <Pressable onPress={() => removeGuardian(guardian.id)} accessibilityRole="button">
-                <AppText variant="caption">Remove</AppText>
+              <Pressable onPress={() => removeGuardian(guardian.id)} accessibilityRole="button" hitSlop={8}>
+                <AppText variant="caption" style={{ color: colors.danger }}>
+                  Remove
+                </AppText>
               </Pressable>
             </View>
             <Switch
               value={guardian.sharing}
               onValueChange={() => toggleSharing(guardian.id)}
-              trackColor={{ true: theme.lime, false: theme.bgSoft }}
-              thumbColor={guardian.sharing ? theme.limeInk : theme.ink}
+              trackColor={{ true: colors.lime, false: colors.bgSoft }}
+              thumbColor={guardian.sharing ? colors.limeInk : colors.bgRaised}
             />
           </View>
         ))
       )}
 
-      <Button label={invite ? "Close" : "Add guardian"} tone="ghost" onPress={() => setInvite((open) => !open)} />
+      <View style={styles.invite}>
+        <Button label={invite ? "Close" : "Add guardian"} tone="ghost" onPress={() => setInvite((open) => !open)} />
+      </View>
 
       {invite ? (
         <View style={styles.form}>
@@ -94,7 +99,7 @@ export function GuardiansScreen() {
           <Field value={relationship} placeholder="Relationship" onChangeText={setRelationship} />
           <Field value={phone} placeholder="Phone" onChangeText={setPhone} />
           {formError ? (
-            <AppText variant="caption" style={styles.error}>
+            <AppText variant="caption" style={{ color: colors.dangerSoft }}>
               {formError}
             </AppText>
           ) : null}
@@ -120,7 +125,7 @@ export function GuardiansScreen() {
       {notices.length === 0 ? null : (
         <View style={styles.notices}>
           {notices.map((notice) => (
-            <View key={notice.id} style={styles.notice}>
+            <View key={notice.id} style={[styles.notice, { borderTopColor: colors.line }]}>
               <AppText variant="strong">{notice.title}</AppText>
               <AppText variant="caption">
                 {timeAgo(notice.at)} · {notice.guardianNames.join(", ") || "No recipients"}
@@ -153,77 +158,56 @@ function Field({
   onChangeText: (value: string) => void;
   testID?: string;
 }) {
+  const { colors } = useTheme();
   return (
     <TextInput
       testID={testID}
       value={value}
       placeholder={placeholder}
-      placeholderTextColor={theme.inkFaint}
+      placeholderTextColor={colors.inkFaint}
       onChangeText={onChangeText}
-      style={styles.input}
+      style={{
+        height: 48,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: colors.line,
+        paddingHorizontal: 14,
+        color: colors.ink,
+        fontFamily: font.body,
+        backgroundColor: colors.bgRaised,
+      }}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  summary: {
-    gap: 8,
-    marginTop: 4,
-    marginBottom: 8,
-  },
+  summary: { gap: 10, marginBottom: 8 },
   profile: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: theme.line,
   },
   avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  flex: { flex: 1, gap: 2 },
+  settings: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.bgRaised,
     borderWidth: 1,
-    borderColor: theme.line,
   },
-  flex: {
-    flex: 1,
-    gap: 2,
-  },
-  settings: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  form: {
-    marginTop: 12,
-    gap: 8,
-  },
-  input: {
-    height: 48,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: theme.line,
-    paddingHorizontal: 14,
-    color: theme.ink,
-    fontFamily: "Manrope_400Regular",
-    backgroundColor: theme.bgRaised,
-  },
-  error: {
-    color: theme.dangerSoft,
-  },
-  notices: {
-    marginTop: 18,
-  },
-  notice: {
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: theme.line,
-    gap: 4,
-  },
+  invite: { marginTop: 8 },
+  form: { marginTop: 12, gap: 8 },
+  notices: { marginTop: 22 },
+  notice: { paddingVertical: 12, borderTopWidth: 1, gap: 4 },
 });

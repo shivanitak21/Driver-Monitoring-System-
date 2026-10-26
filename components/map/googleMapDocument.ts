@@ -1,4 +1,5 @@
-import { darkMapStyle } from "@/constants/mapStyle";
+import { carMarkerSvg } from "@/components/map/carArt";
+import { darkMapStyle, lightMapStyle } from "@/constants/mapStyle";
 import type { Coordinate } from "@/types/domain";
 
 type MapDocumentInput = {
@@ -11,9 +12,17 @@ type MapDocumentInput = {
   trail: Coordinate[];
   deviceFix: Coordinate | null;
   follow: boolean;
+  scheme: "light" | "dark";
+  reduceMotion: boolean;
 };
 
 export function buildGoogleMapHtml(input: MapDocumentInput) {
+  const scheme = input.scheme;
+  const background = scheme === "light" ? "#E4E7EB" : "#101216";
+  const trail = scheme === "light" ? "#4C6110" : "#D7F76B";
+  const road = scheme === "light" ? "rgba(23,25,29,0.28)" : "rgba(245,246,247,0.38)";
+  const dest = scheme === "light" ? "#1F6F6A" : "#8FD4D0";
+  const origin = scheme === "light" ? "#6A7180" : "#8E949E";
   const snapshot = JSON.stringify({
     route: input.route,
     origin: input.origin,
@@ -23,8 +32,15 @@ export function buildGoogleMapHtml(input: MapDocumentInput) {
     trail: input.trail,
     deviceFix: input.deviceFix,
     follow: input.follow,
-    style: darkMapStyle,
+    style: scheme === "light" ? lightMapStyle : darkMapStyle,
+    reduceMotion: input.reduceMotion,
+    background,
+    trailColor: trail,
+    roadColor: road,
+    destColor: dest,
+    originColor: origin,
   });
+  const iconAtZero = JSON.stringify(carMarkerSvg(0));
 
   return `<!DOCTYPE html>
 <html>
@@ -32,14 +48,26 @@ export function buildGoogleMapHtml(input: MapDocumentInput) {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <style>
-    html, body, #map { height: 100%; margin: 0; background: #07080A; }
+    html, body, #map { height: 100%; margin: 0; background: ${background}; }
+    .gm-style-cc, .gm-style > div > a {
+      top: 72px !important;
+      bottom: auto !important;
+      left: 12px !important;
+      right: auto !important;
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
   <script>
     const snapshot = ${snapshot};
-    const state = { map: null, car: null, trail: null, device: null, follow: snapshot.follow, heading: null, lastPan: 0, ready: false, queued: null };
+    const iconTemplate = ${iconAtZero};
+    const state = {
+      map: null, car: null, trail: null, device: null, routeLine: null, originMarker: null, destMarker: null,
+      follow: snapshot.follow, heading: snapshot.heading || 0, iconHeading: null, lastPan: 0, ready: false, queued: null, raf: 0,
+      display: { lat: snapshot.position.latitude, lng: snapshot.position.longitude, heading: snapshot.heading || 0 },
+      target: { lat: snapshot.position.latitude, lng: snapshot.position.longitude, heading: snapshot.heading || 0 }
+    };
 
     function post(message) {
       if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(message));
@@ -57,11 +85,11 @@ export function buildGoogleMapHtml(input: MapDocumentInput) {
     }
 
     function carIcon(heading) {
-      const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="84" height="84" viewBox="0 0 84 84"><g transform="translate(25,13) rotate(' + heading + ' 17 29)"><rect x="4" y="16" width="3.2" height="8" rx="1.2" fill="#242A30"/><rect x="26.8" y="16" width="3.2" height="8" rx="1.2" fill="#242A30"/><rect x="4" y="34" width="3.2" height="8" rx="1.2" fill="#242A30"/><rect x="26.8" y="34" width="3.2" height="8" rx="1.2" fill="#242A30"/><rect x="7" y="6" width="20" height="46" rx="8" fill="#161A1E" stroke="#D6F25C" stroke-width="1.25"/><rect x="10" y="11" width="14" height="13" rx="3" fill="#9BE7E3"/><rect x="10" y="30" width="14" height="12" rx="2.5" fill="#0C0F12"/><rect x="15.2" y="46" width="3.6" height="2.2" rx="0.6" fill="#D6F25C"/></g></svg>';
+      const svg = iconTemplate.replace("rotate(0 48 48)", "rotate(" + heading + " 48 48)");
       return {
         url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
-        scaledSize: new google.maps.Size(84, 84),
-        anchor: new google.maps.Point(42, 42),
+        scaledSize: new google.maps.Size(56, 56),
+        anchor: new google.maps.Point(28, 28),
       };
     }
 
@@ -71,31 +99,64 @@ export function buildGoogleMapHtml(input: MapDocumentInput) {
         scale: scale,
         fillColor: color,
         fillOpacity: 1,
-        strokeColor: "#07080A",
+        strokeColor: snapshot.background,
         strokeWeight: 2,
       };
     }
 
+    function wrap(delta) {
+      let value = delta;
+      while (value > 180) value -= 360;
+      while (value < -180) value += 360;
+      return value;
+    }
+
+    function tick() {
+      state.raf = 0;
+      if (!state.car) return;
+      const dLat = state.target.lat - state.display.lat;
+      const dLng = state.target.lng - state.display.lng;
+      const dH = wrap(state.target.heading - state.display.heading);
+      const jump = Math.abs(dLat) > 0.02 || Math.abs(dLng) > 0.02;
+      const step = snapshot.reduceMotion || jump ? 1 : 0.22;
+      state.display.lat += dLat * step;
+      state.display.lng += dLng * step;
+      state.display.heading += dH * step;
+      state.car.setPosition({ lat: state.display.lat, lng: state.display.lng });
+      const rounded = Math.round(state.display.heading);
+      if (state.iconHeading === null || Math.abs(rounded - state.iconHeading) >= 4 || jump) {
+        state.iconHeading = rounded;
+        state.car.setIcon(carIcon(state.display.heading));
+      }
+      const done = Math.abs(state.target.lat - state.display.lat) < 0.00001 && Math.abs(state.target.lng - state.display.lng) < 0.00001 && Math.abs(wrap(state.target.heading - state.display.heading)) < 0.4;
+      if (!done) state.raf = requestAnimationFrame(tick);
+    }
+
+    function kick() {
+      if (!state.raf) state.raf = requestAnimationFrame(tick);
+    }
+
     function apply(data) {
-      if (!state.ready) {
-        state.queued = data;
+      if (typeof data === "string") {
+        try { data = JSON.parse(data); } catch (error) { return; }
+      }
+      if (!data || !data.position || !state.ready) {
+        if (data && !state.ready) state.queued = data;
         return;
       }
-    const position = latLng(data.position);
-    const previous = state.car.getPosition();
-    const jumped = previous && (Math.abs(previous.lat() - position.lat) > 0.02 || Math.abs(previous.lng() - position.lng) > 0.02);
-    state.car.setPosition(position);
-      if (state.heading === null || Math.abs(data.heading - state.heading) > 2) {
-        state.heading = data.heading;
-        state.car.setIcon(carIcon(data.heading));
-      }
+      if (!state.car || !state.trail) return;
+      const position = latLng(data.position);
+      const previous = state.display;
+      const jumped = Math.abs(previous.lat - position.lat) > 0.02 || Math.abs(previous.lng - position.lng) > 0.02;
+      state.target = { lat: position.lat, lng: position.lng, heading: data.heading || 0 };
+      kick();
       state.trail.setPath((data.trail || []).map(latLng));
-    if (data.route && data.route.length && state.routeLine) {
-      const line = data.route.map(latLng);
-      state.routeLine.setPath(line);
-      if (state.originMarker) state.originMarker.setPosition(line[0]);
-      if (state.destMarker) state.destMarker.setPosition(line[line.length - 1]);
-    }
+      if (data.route && data.route.length && state.routeLine) {
+        const line = data.route.map(latLng);
+        state.routeLine.setPath(line);
+        if (state.originMarker) state.originMarker.setPosition(line[0]);
+        if (state.destMarker) state.destMarker.setPosition(line[line.length - 1]);
+      }
       if (data.deviceFix) {
         state.device.setPosition(latLng(data.deviceFix));
         state.device.setMap(state.map);
@@ -103,14 +164,14 @@ export function buildGoogleMapHtml(input: MapDocumentInput) {
         state.device.setMap(null);
       }
       state.follow = data.follow;
-    if (data.follow) {
-      const now = Date.now();
-      if (jumped || now - state.lastPan > 1500) {
-        state.lastPan = now;
-        state.map.panTo(position);
-        if (jumped) state.map.setZoom(15);
+      if (data.follow) {
+        const now = Date.now();
+        if (jumped || now - state.lastPan > 1500) {
+          state.lastPan = now;
+          state.map.panTo({ lat: position.lat - 0.0032, lng: position.lng });
+          if (jumped) state.map.setZoom(15);
+        }
       }
-    }
     }
 
     window.updateRide = apply;
@@ -122,28 +183,29 @@ export function buildGoogleMapHtml(input: MapDocumentInput) {
     function initMap() {
       const position = latLng(snapshot.position);
       state.map = new google.maps.Map(document.getElementById("map"), {
-        center: position,
+        center: snapshot.follow ? { lat: position.lat - 0.0032, lng: position.lng } : position,
         zoom: 15,
         disableDefaultUI: true,
+        keyboardShortcuts: false,
         gestureHandling: "greedy",
-        backgroundColor: "#07080A",
+        backgroundColor: snapshot.background,
         styles: snapshot.style,
         clickableIcons: false,
       });
       state.routeLine = new google.maps.Polyline({
         path: snapshot.route.map(latLng),
-        strokeColor: "rgba(243,240,232,0.35)",
+        strokeColor: snapshot.roadColor,
         strokeWeight: 3,
         map: state.map,
       });
       state.trail = new google.maps.Polyline({
         path: (snapshot.trail || []).map(latLng),
-        strokeColor: "#D6F25C",
+        strokeColor: snapshot.trailColor,
         strokeWeight: 4,
         map: state.map,
       });
-      state.originMarker = new google.maps.Marker({ position: latLng(snapshot.origin), icon: dot("#8E8A82", 5), map: state.map, clickable: false });
-      state.destMarker = new google.maps.Marker({ position: latLng(snapshot.destination), icon: dot("#8FE3E0", 7), map: state.map, clickable: false });
+      state.originMarker = new google.maps.Marker({ position: latLng(snapshot.origin), icon: dot(snapshot.originColor, 5), map: state.map, clickable: false });
+      state.destMarker = new google.maps.Marker({ position: latLng(snapshot.destination), icon: dot(snapshot.destColor, 7), map: state.map, clickable: false });
       state.device = new google.maps.Marker({ position: position, icon: dot("#7EB6FF", 8), clickable: false, zIndex: 4 });
       if (snapshot.deviceFix) {
         state.device.setPosition(latLng(snapshot.deviceFix));
@@ -156,7 +218,7 @@ export function buildGoogleMapHtml(input: MapDocumentInput) {
         optimized: false,
         zIndex: 5,
       });
-      state.heading = snapshot.heading || 0;
+      state.iconHeading = Math.round(snapshot.heading || 0);
       state.car.addListener("click", function () { post({ type: "vehicle" }); });
       state.map.addListener("dragstart", function () { post({ type: "pan" }); });
       state.ready = true;

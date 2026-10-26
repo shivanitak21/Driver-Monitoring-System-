@@ -1,0 +1,470 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-23T12:31:00.000Z",
+  "title": "Design System: VMS",
+  "extensions": {
+    "colorMeta": {
+      "lime": {
+        "role": "primary",
+        "displayName": "Lime Instrument",
+        "canonical": "#D7F76B",
+        "tonalRamp": ["oklch(15% 0.169 120.6)", "oklch(26% 0.169 120.6)", "oklch(38% 0.169 120.6)", "oklch(50% 0.169 120.6)", "oklch(62% 0.169 120.6)", "oklch(74% 0.169 120.6)", "oklch(86% 0.169 120.6)", "oklch(95% 0.169 120.6)"]
+      },
+      "lime-ink": {
+        "role": "primary",
+        "displayName": "Lime Ink",
+        "canonical": "#1A1E0C",
+        "tonalRamp": ["oklch(15% 0.032 119.3)", "oklch(26% 0.032 119.3)", "oklch(38% 0.032 119.3)", "oklch(50% 0.032 119.3)", "oklch(62% 0.032 119.3)", "oklch(74% 0.032 119.3)", "oklch(86% 0.032 119.3)", "oklch(95% 0.032 119.3)"]
+      },
+      "signal-on-paper": {
+        "role": "primary",
+        "displayName": "Signal on Paper",
+        "canonical": "#4C6110",
+        "tonalRamp": ["oklch(15% 0.106 123.8)", "oklch(26% 0.106 123.8)", "oklch(38% 0.106 123.8)", "oklch(50% 0.106 123.8)", "oklch(62% 0.106 123.8)", "oklch(74% 0.106 123.8)", "oklch(86% 0.106 123.8)", "oklch(95% 0.106 123.8)"]
+      },
+      "amber": {
+        "role": "secondary",
+        "displayName": "Amber Instrument",
+        "canonical": "#E6B15A",
+        "tonalRamp": ["oklch(15% 0.121 77.9)", "oklch(26% 0.121 77.9)", "oklch(38% 0.121 77.9)", "oklch(50% 0.121 77.9)", "oklch(62% 0.121 77.9)", "oklch(74% 0.121 77.9)", "oklch(86% 0.121 77.9)", "oklch(95% 0.121 77.9)"]
+      },
+      "amber-on-paper": {
+        "role": "secondary",
+        "displayName": "Amber on Paper",
+        "canonical": "#8A5A10",
+        "tonalRamp": ["oklch(15% 0.103 71.2)", "oklch(26% 0.103 71.2)", "oklch(38% 0.103 71.2)", "oklch(50% 0.103 71.2)", "oklch(62% 0.103 71.2)", "oklch(74% 0.103 71.2)", "oklch(86% 0.103 71.2)", "oklch(95% 0.103 71.2)"]
+      },
+      "danger": {
+        "role": "secondary",
+        "displayName": "Danger",
+        "canonical": "#FF453A",
+        "tonalRamp": ["oklch(15% 0.224 28.3)", "oklch(26% 0.224 28.3)", "oklch(38% 0.224 28.3)", "oklch(50% 0.224 28.3)", "oklch(62% 0.224 28.3)", "oklch(74% 0.224 28.3)", "oklch(86% 0.224 28.3)", "oklch(95% 0.224 28.3)"]
+      },
+      "danger-on-paper": {
+        "role": "secondary",
+        "displayName": "Danger on Paper",
+        "canonical": "#D1261E",
+        "tonalRamp": ["oklch(15% 0.206 28.8)", "oklch(26% 0.206 28.8)", "oklch(38% 0.206 28.8)", "oklch(50% 0.206 28.8)", "oklch(62% 0.206 28.8)", "oklch(74% 0.206 28.8)", "oklch(86% 0.206 28.8)", "oklch(95% 0.206 28.8)"]
+      },
+      "danger-soft": {
+        "role": "secondary",
+        "displayName": "Danger Soft",
+        "canonical": "#FF8A80",
+        "tonalRamp": ["oklch(15% 0.144 26.1)", "oklch(26% 0.144 26.1)", "oklch(38% 0.144 26.1)", "oklch(50% 0.144 26.1)", "oklch(62% 0.144 26.1)", "oklch(74% 0.144 26.1)", "oklch(86% 0.144 26.1)", "oklch(95% 0.144 26.1)"]
+      },
+      "danger-soft-on-paper": {
+        "role": "secondary",
+        "displayName": "Danger Soft on Paper",
+        "canonical": "#A3201A",
+        "tonalRamp": ["oklch(15% 0.168 28.4)", "oklch(26% 0.168 28.4)", "oklch(38% 0.168 28.4)", "oklch(50% 0.168 28.4)", "oklch(62% 0.168 28.4)", "oklch(74% 0.168 28.4)", "oklch(86% 0.168 28.4)", "oklch(95% 0.168 28.4)"]
+      },
+      "on-danger": {
+        "role": "secondary",
+        "displayName": "On Danger",
+        "canonical": "#FFFFFF",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "cyan": {
+        "role": "tertiary",
+        "displayName": "Cyan Instrument",
+        "canonical": "#8FD4D0",
+        "tonalRamp": ["oklch(15% 0.070 191.3)", "oklch(26% 0.070 191.3)", "oklch(38% 0.070 191.3)", "oklch(50% 0.070 191.3)", "oklch(62% 0.070 191.3)", "oklch(74% 0.070 191.3)", "oklch(86% 0.070 191.3)", "oklch(95% 0.070 191.3)"]
+      },
+      "cyan-on-paper": {
+        "role": "tertiary",
+        "displayName": "Cyan on Paper",
+        "canonical": "#1F6F6A",
+        "tonalRamp": ["oklch(15% 0.075 188.9)", "oklch(26% 0.075 188.9)", "oklch(38% 0.075 188.9)", "oklch(50% 0.075 188.9)", "oklch(62% 0.075 188.9)", "oklch(74% 0.075 188.9)", "oklch(86% 0.075 188.9)", "oklch(95% 0.075 188.9)"]
+      },
+      "graphite": {
+        "role": "neutral",
+        "displayName": "Graphite",
+        "canonical": "#090A0C",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "graphite-raised": {
+        "role": "neutral",
+        "displayName": "Raised Graphite",
+        "canonical": "#14171C",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "graphite-soft": {
+        "role": "neutral",
+        "displayName": "Soft Graphite",
+        "canonical": "#1C2128",
+        "tonalRamp": ["oklch(15% 0.015 256.8)", "oklch(26% 0.015 256.8)", "oklch(38% 0.015 256.8)", "oklch(50% 0.015 256.8)", "oklch(62% 0.015 256.8)", "oklch(74% 0.015 256.8)", "oklch(86% 0.015 256.8)", "oklch(95% 0.015 256.8)"]
+      },
+      "graphite-chip": {
+        "role": "neutral",
+        "displayName": "Chip Graphite",
+        "canonical": "#2A3038",
+        "tonalRamp": ["oklch(15% 0.017 255.6)", "oklch(26% 0.017 255.6)", "oklch(38% 0.017 255.6)", "oklch(50% 0.017 255.6)", "oklch(62% 0.017 255.6)", "oklch(74% 0.017 255.6)", "oklch(86% 0.017 255.6)", "oklch(95% 0.017 255.6)"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Pearl Ink",
+        "canonical": "#F5F6F7",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Muted Steel",
+        "canonical": "#A1A6AF",
+        "tonalRamp": ["oklch(15% 0.014 262.4)", "oklch(26% 0.014 262.4)", "oklch(38% 0.014 262.4)", "oklch(50% 0.014 262.4)", "oklch(62% 0.014 262.4)", "oklch(74% 0.014 262.4)", "oklch(86% 0.014 262.4)", "oklch(95% 0.014 262.4)"]
+      },
+      "ink-faint": {
+        "role": "neutral",
+        "displayName": "Faint Steel",
+        "canonical": "#8B929C",
+        "tonalRamp": ["oklch(15% 0.017 257.2)", "oklch(26% 0.017 257.2)", "oklch(38% 0.017 257.2)", "oklch(50% 0.017 257.2)", "oklch(62% 0.017 257.2)", "oklch(74% 0.017 257.2)", "oklch(86% 0.017 257.2)", "oklch(95% 0.017 257.2)"]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "rgba(255,255,255,0.10)",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "line-strong": {
+        "role": "neutral",
+        "displayName": "Strong Hairline",
+        "canonical": "rgba(255,255,255,0.18)",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "glass": {
+        "role": "neutral",
+        "displayName": "Glass",
+        "canonical": "rgba(16,18,22,0.78)",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "glass-tint": {
+        "role": "neutral",
+        "displayName": "Glass Tint",
+        "canonical": "rgba(9,10,12,0.42)",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "map-ground": {
+        "role": "neutral",
+        "displayName": "Map Ground",
+        "canonical": "#101216",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "scrim": {
+        "role": "neutral",
+        "displayName": "Scrim",
+        "canonical": "rgba(0,0,0,0.58)",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "shadow": {
+        "role": "neutral",
+        "displayName": "Shadow",
+        "canonical": "#000000",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Cool Paper",
+        "canonical": "#F3F4F6",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "paper-raised": {
+        "role": "neutral",
+        "displayName": "Raised Paper",
+        "canonical": "#FFFFFF",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "paper-soft": {
+        "role": "neutral",
+        "displayName": "Soft Paper",
+        "canonical": "#E6E9ED",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "ink-on-paper": {
+        "role": "neutral",
+        "displayName": "Graphite Ink",
+        "canonical": "#17191D",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "ink-muted-on-paper": {
+        "role": "neutral",
+        "displayName": "Cool Muted",
+        "canonical": "#5C6370",
+        "tonalRamp": ["oklch(15% 0.022 262.9)", "oklch(26% 0.022 262.9)", "oklch(38% 0.022 262.9)", "oklch(50% 0.022 262.9)", "oklch(62% 0.022 262.9)", "oklch(74% 0.022 262.9)", "oklch(86% 0.022 262.9)", "oklch(95% 0.022 262.9)"]
+      },
+      "ink-faint-on-paper": {
+        "role": "neutral",
+        "displayName": "Cool Faint",
+        "canonical": "#6A7180",
+        "tonalRamp": ["oklch(15% 0.025 265.6)", "oklch(26% 0.025 265.6)", "oklch(38% 0.025 265.6)", "oklch(50% 0.025 265.6)", "oklch(62% 0.025 265.6)", "oklch(74% 0.025 265.6)", "oklch(86% 0.025 265.6)", "oklch(95% 0.025 265.6)"]
+      },
+      "line-on-paper": {
+        "role": "neutral",
+        "displayName": "Paper Hairline",
+        "canonical": "rgba(23,25,29,0.08)",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "line-strong-on-paper": {
+        "role": "neutral",
+        "displayName": "Paper Strong Hairline",
+        "canonical": "rgba(23,25,29,0.14)",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "glass-on-paper": {
+        "role": "neutral",
+        "displayName": "Paper Glass",
+        "canonical": "rgba(255,255,255,0.84)",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "glass-tint-on-paper": {
+        "role": "neutral",
+        "displayName": "Paper Glass Tint",
+        "canonical": "rgba(255,255,255,0.55)",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "map-ground-light": {
+        "role": "neutral",
+        "displayName": "Map Paper",
+        "canonical": "#E4E7EB",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "scrim-on-paper": {
+        "role": "neutral",
+        "displayName": "Paper Scrim",
+        "canonical": "rgba(23,25,29,0.32)",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "shadow-on-paper": {
+        "role": "neutral",
+        "displayName": "Paper Shadow",
+        "canonical": "rgba(23,25,29,0.16)",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "marker-pearl": {
+        "role": "neutral",
+        "displayName": "Marker Pearl",
+        "canonical": "#F4F6F8",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "marker-edge": {
+        "role": "neutral",
+        "displayName": "Marker Edge",
+        "canonical": "#C5CCD4",
+        "tonalRamp": ["oklch(15% 0.014 251.6)", "oklch(26% 0.014 251.6)", "oklch(38% 0.014 251.6)", "oklch(50% 0.014 251.6)", "oklch(62% 0.014 251.6)", "oklch(74% 0.014 251.6)", "oklch(86% 0.014 251.6)", "oklch(95% 0.014 251.6)"]
+      },
+      "marker-cabin": {
+        "role": "neutral",
+        "displayName": "Marker Cabin",
+        "canonical": "#1A1E24",
+        "tonalRamp": ["oklch(15% 0.013 258.4)", "oklch(26% 0.013 258.4)", "oklch(38% 0.013 258.4)", "oklch(50% 0.013 258.4)", "oklch(62% 0.013 258.4)", "oklch(74% 0.013 258.4)", "oklch(86% 0.013 258.4)", "oklch(95% 0.013 258.4)"]
+      },
+      "marker-roof": {
+        "role": "neutral",
+        "displayName": "Marker Roof",
+        "canonical": "#E7EAEF",
+        "tonalRamp": ["oklch(15% 0.000 0.0)", "oklch(26% 0.000 0.0)", "oklch(38% 0.000 0.0)", "oklch(50% 0.000 0.0)", "oklch(62% 0.000 0.0)", "oklch(74% 0.000 0.0)", "oklch(86% 0.000 0.0)", "oklch(95% 0.000 0.0)"]
+      },
+      "marker-tire": {
+        "role": "neutral",
+        "displayName": "Marker Tire",
+        "canonical": "#22262C",
+        "tonalRamp": ["oklch(15% 0.013 258.4)", "oklch(26% 0.013 258.4)", "oklch(38% 0.013 258.4)", "oklch(50% 0.013 258.4)", "oklch(62% 0.013 258.4)", "oklch(74% 0.013 258.4)", "oklch(86% 0.013 258.4)", "oklch(95% 0.013 258.4)"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Call clock and call phase only." },
+      "title": { "displayName": "Title", "purpose": "Page titles, sheet titles, and screen-state titles." },
+      "metric": { "displayName": "Metric", "purpose": "Instrument numbers with tabular figures." },
+      "body": { "displayName": "Body", "purpose": "Supporting sentences in muted steel." },
+      "label": { "displayName": "Label", "purpose": "The caption above a metric." },
+      "strong": { "displayName": "Strong", "purpose": "Names, row titles, and button labels." },
+      "caption": { "displayName": "Caption", "purpose": "Secondary lines, dock labels, and status pills." }
+    },
+    "shadows": [
+      {
+        "name": "dock-drop",
+        "value": "0 10px 18px rgba(0,0,0,0.28)",
+        "purpose": "The floating tab bar on graphite. On paper the shadow color is rgba(23,25,29,0.16) at the same offset, opacity 0.28, and radius."
+      },
+      {
+        "name": "sedan-contact",
+        "value": "ellipse rgba(0,0,0,0.22)",
+        "purpose": "Fixed ground shadow under the sedan. It does not rotate with heading and is not a box shadow."
+      }
+    ],
+    "motion": [
+      {
+        "name": "press",
+        "value": "opacity 0.82, scale 0.98",
+        "purpose": "Button press. Icon buttons and SOS scale to 0.96. Disabled controls stay at opacity 0.4."
+      },
+      {
+        "name": "score-ring",
+        "value": "700ms cubic-bezier(0.33, 1, 0.68, 1)",
+        "purpose": "Safety ring progress. Duration is 0 when reduced motion is on."
+      },
+      {
+        "name": "sheet-enter",
+        "value": "480ms fade-in-down",
+        "purpose": "Live telemetry card entrance. Skipped when reduced motion is on."
+      },
+      {
+        "name": "sos-pulse",
+        "value": "1400ms scale 1 to 1.16, reverse, opacity 2 minus scale",
+        "purpose": "SOS ring pulse. Omitted when reduced motion is on."
+      },
+      {
+        "name": "map-follow",
+        "value": "700ms",
+        "purpose": "Camera follow toward the vehicle. Duration is 0 when reduced motion is on."
+      },
+      {
+        "name": "stack",
+        "value": "slide_from_right",
+        "purpose": "Stack screen transition."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-lime",
+      "description": "The lime instrument action. Manrope 600 at 15px, lime ink on lime.",
+      "html": "<button class=\"ds-btn-lime\">Allow and connect</button>",
+      "css": ".ds-btn-lime { background: #D7F76B; color: #1A1E0C; min-height: 48px; padding: 0 16px; border: none; border-radius: 16px; font-family: Manrope, sans-serif; font-weight: 600; font-size: 15px; transition: opacity 0.15s ease, transform 0.15s ease; } .ds-btn-lime:hover { opacity: 0.92; } .ds-btn-lime:active { opacity: 0.82; transform: scale(0.98); } .ds-btn-lime:focus-visible { outline: 2px solid #F5F6F7; outline-offset: 3px; } .ds-btn-lime:disabled { opacity: 0.4; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "A secondary action with a strong hairline and no fill.",
+      "html": "<button class=\"ds-btn-ghost\">Continue without it</button>",
+      "css": ".ds-btn-ghost { background: transparent; color: #F5F6F7; min-height: 48px; padding: 0 16px; border: 1px solid rgba(255,255,255,0.18); border-radius: 16px; font-family: Manrope, sans-serif; font-weight: 600; font-size: 15px; transition: opacity 0.15s ease, transform 0.15s ease; } .ds-btn-ghost:hover { opacity: 0.92; } .ds-btn-ghost:active { opacity: 0.82; transform: scale(0.98); } .ds-btn-ghost:focus-visible { outline: 2px solid #D7F76B; outline-offset: 3px; }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "A destructive action. White label on danger.",
+      "html": "<button class=\"ds-btn-danger\">End ride</button>",
+      "css": ".ds-btn-danger { background: #FF453A; color: #FFFFFF; min-height: 48px; padding: 0 16px; border: none; border-radius: 16px; font-family: Manrope, sans-serif; font-weight: 600; font-size: 15px; transition: opacity 0.15s ease, transform 0.15s ease; } .ds-btn-danger:hover { opacity: 0.92; } .ds-btn-danger:active { opacity: 0.82; transform: scale(0.98); } .ds-btn-danger:focus-visible { outline: 2px solid #F5F6F7; outline-offset: 3px; }"
+    },
+    {
+      "name": "Icon Button",
+      "kind": "button",
+      "refersTo": "button-icon",
+      "description": "A 48px glass circle for map tools. The mark is an 18px line icon.",
+      "html": "<button class=\"ds-icon-btn\" aria-label=\"Recenter on vehicle\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\"><line x1=\"2\" x2=\"5\" y1=\"12\" y2=\"12\"/><line x1=\"19\" x2=\"22\" y1=\"12\" y2=\"12\"/><line x1=\"12\" x2=\"12\" y1=\"2\" y2=\"5\"/><line x1=\"12\" x2=\"12\" y1=\"19\" y2=\"22\"/><circle cx=\"12\" cy=\"12\" r=\"7\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/></svg></button>",
+      "css": ".ds-icon-btn { width: 48px; height: 48px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.10); background: rgba(16,18,22,0.78); color: #F5F6F7; display: inline-flex; align-items: center; justify-content: center; padding: 0; transition: opacity 0.15s ease, transform 0.15s ease; } .ds-icon-btn svg { width: 18px; height: 18px; } .ds-icon-btn:hover { opacity: 0.92; } .ds-icon-btn:active { opacity: 0.82; transform: scale(0.96); } .ds-icon-btn:focus-visible { outline: 2px solid #D7F76B; outline-offset: 3px; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "A 48px raised field with a hairline. Placeholder is faint steel.",
+      "html": "<input class=\"ds-field\" placeholder=\"Name\" value=\"\">",
+      "css": ".ds-field { height: 48px; width: 100%; border-radius: 14px; border: 1px solid rgba(255,255,255,0.10); background: #14171C; color: #F5F6F7; padding: 0 14px; font-family: Manrope, sans-serif; font-weight: 400; font-size: 15px; } .ds-field::placeholder { color: #8B929C; } .ds-field:hover { border-color: rgba(255,255,255,0.18); } .ds-field:focus-visible { outline: 2px solid #D7F76B; outline-offset: 2px; }"
+    },
+    {
+      "name": "Glass Card",
+      "kind": "card",
+      "refersTo": "glass-card",
+      "description": "Floating telemetry. Blur stands in for BlurView intensity 36, with the glass fill and tint.",
+      "html": "<div class=\"ds-glass\"><div class=\"ds-glass-label\">ETA</div><div class=\"ds-glass-metric\">12 min</div></div>",
+      "css": ".ds-glass { border-radius: 28px; border: 1px solid rgba(255,255,255,0.10); background: rgba(16,18,22,0.78); box-shadow: inset 0 0 0 1000px rgba(9,10,12,0.42); backdrop-filter: blur(18px); padding: 14px 16px; width: 240px; } .ds-glass-label { font-family: Manrope, sans-serif; font-weight: 500; font-size: 13px; letter-spacing: 0.1px; color: #8B929C; } .ds-glass-metric { font-family: Sora, sans-serif; font-weight: 500; font-size: 22px; letter-spacing: -0.6px; font-variant-numeric: tabular-nums; color: #F5F6F7; margin-top: 2px; }"
+    },
+    {
+      "name": "Dock",
+      "kind": "nav",
+      "refersTo": "dock",
+      "description": "The floating five-tab bar. The active tab is lime with lime ink.",
+      "html": "<nav class=\"ds-dock\"><button class=\"ds-dock-tab ds-dock-tab-on\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linejoin=\"round\"><polygon points=\"3 11 22 2 13 21 11 13 3 11\"/></svg><span>Live</span></button><button class=\"ds-dock-tab\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\"><circle cx=\"6\" cy=\"19\" r=\"3\"/><path d=\"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15\"/><circle cx=\"18\" cy=\"5\" r=\"3\"/></svg><span>Trips</span></button><button class=\"ds-dock-tab\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linejoin=\"round\"><path d=\"m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5\"/><rect x=\"2\" y=\"6\" width=\"14\" height=\"12\" rx=\"2\"/></svg><span>Cabin</span></button><button class=\"ds-dock-tab\"><span class=\"ds-dock-badge\"></span><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\"><path d=\"M10.268 21a2 2 0 0 0 3.464 0\"/><path d=\"M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326\"/></svg><span>Alerts</span></button><button class=\"ds-dock-tab\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\"><path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><path d=\"M16 3.128a4 4 0 0 1 0 7.744\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/></svg><span>Family</span></button></nav>",
+      "css": ".ds-dock { height: 62px; display: flex; align-items: center; padding: 0 6px; border-radius: 26px; border: 1px solid rgba(255,255,255,0.10); background: rgba(16,18,22,0.78); box-shadow: 0 10px 18px rgba(0,0,0,0.28), inset 0 0 0 1000px rgba(9,10,12,0.42); backdrop-filter: blur(18px); } .ds-dock-tab { position: relative; flex: 1; height: 48px; border: none; border-radius: 18px; background: transparent; color: #A1A6AF; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-family: Manrope, sans-serif; font-weight: 500; font-size: 11px; } .ds-dock-tab svg { width: 18px; height: 18px; } .ds-dock-tab-on { background: #D7F76B; color: #1A1E0C; } .ds-dock-tab:hover { opacity: 0.92; } .ds-dock-tab:focus-visible { outline: 2px solid #D7F76B; outline-offset: 2px; } .ds-dock-badge { position: absolute; top: 8px; right: 16px; width: 6px; height: 6px; border-radius: 3px; background: #FF453A; }"
+    },
+    {
+      "name": "Status Pill",
+      "kind": "chip",
+      "refersTo": "status-pill",
+      "description": "Safe, caution, or emergency, with a 6px dot and a caption in the status color.",
+      "html": "<span class=\"ds-pill\"><i></i>Safe</span>",
+      "css": ".ds-pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 6px 10px; background: #1C2128; color: #D7F76B; font-family: Manrope, sans-serif; font-weight: 500; font-size: 13px; line-height: 18px; } .ds-pill i { width: 6px; height: 6px; border-radius: 3px; background: #D7F76B; display: block; }"
+    },
+    {
+      "name": "SOS",
+      "kind": "button",
+      "refersTo": "sos-button",
+      "description": "A 52px danger circle. The pulse scales from 1 to 1.16 over 1400ms.",
+      "html": "<button class=\"ds-sos\" aria-label=\"Raise SOS\"><span>SOS</span></button>",
+      "css": ".ds-sos { position: relative; width: 52px; height: 52px; border: none; border-radius: 26px; background: #FF453A; color: #FFFFFF; font-family: Manrope, sans-serif; font-weight: 600; font-size: 13px; letter-spacing: 0.6px; } .ds-sos::before { content: \"\"; position: absolute; inset: 0; border-radius: 26px; background: #FF453A; animation: ds-sos-pulse 1400ms ease-in-out infinite alternate; z-index: -1; } .ds-sos:hover { opacity: 0.92; } .ds-sos:active { transform: scale(0.96); } .ds-sos:focus-visible { outline: 2px solid #F5F6F7; outline-offset: 3px; } @keyframes ds-sos-pulse { from { transform: scale(1); opacity: 1; } to { transform: scale(1.16); opacity: 0.84; } }"
+    },
+    {
+      "name": "Sedan Marker",
+      "kind": "custom",
+      "refersTo": "sedan-marker",
+      "description": "The pearl top-down sedan. Shown at 72px. The ground ellipse stays fixed while the body rotates with heading.",
+      "html": "<svg class=\"ds-sedan\" viewBox=\"0 0 96 96\" role=\"img\" aria-label=\"Vehicle\"><ellipse cx=\"48\" cy=\"50\" rx=\"20\" ry=\"32\" fill=\"rgba(0,0,0,0.22)\"/><g><rect x=\"29.2\" y=\"27.5\" width=\"7.2\" height=\"15\" rx=\"2.6\" fill=\"#22262C\"/><rect x=\"59.6\" y=\"27.5\" width=\"7.2\" height=\"15\" rx=\"2.6\" fill=\"#22262C\"/><rect x=\"29.2\" y=\"56.2\" width=\"7.2\" height=\"15\" rx=\"2.6\" fill=\"#22262C\"/><rect x=\"59.6\" y=\"56.2\" width=\"7.2\" height=\"15\" rx=\"2.6\" fill=\"#22262C\"/><rect x=\"31\" y=\"30.4\" width=\"3.6\" height=\"9.2\" rx=\"1.2\" fill=\"#5A616A\"/><rect x=\"61.4\" y=\"30.4\" width=\"3.6\" height=\"9.2\" rx=\"1.2\" fill=\"#5A616A\"/><rect x=\"31\" y=\"59.1\" width=\"3.6\" height=\"9.2\" rx=\"1.2\" fill=\"#5A616A\"/><rect x=\"61.4\" y=\"59.1\" width=\"3.6\" height=\"9.2\" rx=\"1.2\" fill=\"#5A616A\"/><path d=\"M48 11.5C56.2 12.2 60.4 18.4 61.5 28.2C62.4 35.6 61.4 42.2 60.5 51.5C59.6 61.2 60.4 69.2 58.8 75.4C57 81.8 52.8 84.6 48 84.6C43.2 84.6 39 81.8 37.2 75.4C35.6 69.2 36.4 61.2 35.5 51.5C34.6 42.2 33.6 35.6 34.5 28.2C35.6 18.4 39.8 12.2 48 11.5Z\" fill=\"#F4F6F8\" stroke=\"#C5CCD4\" stroke-width=\"1\"/><path d=\"M41.2 18.2C44.2 16.8 51.8 16.8 54.8 18.2C55.6 23.4 54.2 29.2 52.4 33.2H43.6C41.8 29.2 40.4 23.4 41.2 18.2Z\" fill=\"#FFFFFF\" opacity=\"0.72\"/><path d=\"M40.2 35.2H55.8C56.8 35.2 57.5 36.1 57.2 37.2L55.2 44.6C54.8 46.2 53.2 47.1 48 47.1C42.8 47.1 41.2 46.2 40.8 44.6L38.8 37.2C38.5 36.1 39.2 35.2 40.2 35.2Z\" fill=\"#1A1E24\"/><path d=\"M40.6 48.4H55.4C56.4 48.4 57 49.1 57 50.1V58.2C57 59.4 56.2 60.2 54.8 60.2H41.2C39.8 60.2 39 59.4 39 58.2V50.1C39 49.1 39.6 48.4 40.6 48.4Z\" fill=\"#E7EAEF\"/><path d=\"M40.4 62.2H55.6C56.4 62.2 57 63 56.6 64.2L54.6 70.2C54.2 71.4 53 72.2 48 72.2C43 72.2 41.8 71.4 41.4 70.2L39.4 64.2C39 63 39.6 62.2 40.4 62.2Z\" fill=\"#1A1E24\"/><rect x=\"24.6\" y=\"33.4\" width=\"8.4\" height=\"5.4\" rx=\"2.2\" fill=\"#D5DAE1\" stroke=\"#8E96A1\" stroke-width=\"0.6\"/><rect x=\"63\" y=\"33.4\" width=\"8.4\" height=\"5.4\" rx=\"2.2\" fill=\"#D5DAE1\" stroke=\"#8E96A1\" stroke-width=\"0.6\"/><rect x=\"39.2\" y=\"15.2\" width=\"6.2\" height=\"2.3\" rx=\"1\" fill=\"#F7FBFF\"/><rect x=\"50.6\" y=\"15.2\" width=\"6.2\" height=\"2.3\" rx=\"1\" fill=\"#F7FBFF\"/><rect x=\"40.2\" y=\"77.4\" width=\"15.6\" height=\"2.8\" rx=\"1.3\" fill=\"#D7F76B\"/></g></svg>",
+      "css": ".ds-sedan { width: 72px; height: 72px; display: block; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Instrument",
+    "overview": "VMS is a quiet automotive instrument for one live ride. The vehicle is a pearl top-down sedan on a muted map, and the chrome around it is either graphite or cool gray, with lime reserved for selected, occupied, safe, and primary states. Dark graphite is the boot palette and the default until a saved appearance is read. Light is the same structure on cool paper, with darker signal, amber, danger, and cyan so status stays readable. Sora carries titles and metrics. Manrope carries everything a person reads or taps.\n\nDepth is tonal. Page groups, sheets, and the SOS confirmation are opaque raised fills with a hairline. Blurred glass is limited to chrome that floats: the live identity, the alert popover, the telemetry card, the dock, and call permission panels. Presses scale down and fire a selection haptic. The safety ring eases over 700ms, the telemetry card fades up over 480ms, and the SOS ring pulses over 1400ms. All three yield when the platform asks for reduced motion.",
+    "keyCharacteristics": [
+      "Graphite dark and cool-gray light, with lime as the instrument accent",
+      "Sora for titles and metrics, Manrope for UI",
+      "Blurred glass only on floating chrome, the dock, and call panels",
+      "Pearl top-down sedan marker with a fixed ground shadow",
+      "Circular controls and a floating five-tab dock"
+    ],
+    "rules": [
+      {
+        "name": "The Lime Instrument Rule",
+        "body": "Lime marks a selected, occupied, safe, or primary state. It is the primary button, the active dock tab, an occupied seat, an attentive cabin pill, a switch that is on, and the sedan's rear lamp. On graphite the live dot and the safe signal are the same lime. On paper, status strokes use signal-on-paper. Lime is not a page or map background.",
+        "section": "colors"
+      },
+      {
+        "name": "The Paired Semantic Rule",
+        "body": "Amber, danger, danger-soft, and cyan each have a graphite value and a darker paper value. Render the pair that matches the active scheme. The light theme is a full palette, not the dark palette with a white background.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Faces Rule",
+        "body": "Sora is for titles and metrics. Manrope is for body, labels, captions, and controls. Do not set a metric in Manrope or a button in Sora.",
+        "section": "typography"
+      },
+      {
+        "name": "The Two Planes Rule",
+        "body": "The live ride is the map, with floating chrome inset 16px. Every other screen is a filled page with a 20px side inset, a Sora title, and a scroll that clears the dock.",
+        "section": "layout"
+      },
+      {
+        "name": "The Glass Ceiling Rule",
+        "body": "The blurred glass shell is the live identity pill, the alert popover, the telemetry card, the dock, and call permission panels. Page groups, the vehicle sheet, and the SOS confirmation stay opaque raised fills with a hairline.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Reduced Motion Rule",
+        "body": "When the platform reports reduced motion, the SOS pulse is omitted, the safety ring snaps to its value, the telemetry card does not fade in, and map follow animation duration is 0.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Circle Control Rule",
+        "body": "A tappable icon on the map, in the page header, or on a call is a 48px circle. SOS is the 52px exception. Rectangular buttons stay on the 16px radius and at least 48px tall. Segment cells and screen-state actions stay at least 44px tall.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do boot on graphite, and treat light as a full cool-gray palette with its own signal, amber, danger, danger-soft, and cyan.",
+      "Do keep primary buttons at 48px height, 16px radius, lime fill, and lime-ink labels in Manrope 600 at 15px.",
+      "Do float the dock, the live identity, and the telemetry card in blurred glass over the map.",
+      "Do draw the sedan at 72px inside an 84px target, with the ground shadow fixed and the body rotated to heading.",
+      "Do set metrics in Sora 500 with tabular figures, and body copy in Manrope 400 at 15px with 21px line height."
+    ],
+    "donts": [
+      "Don't paint page cards, the vehicle sheet, or the SOS confirmation with blurred glass.",
+      "Don't use lime as a page or map background, or as a status stroke on the light theme.",
+      "Don't replace the pearl sedan with a pin, an emoji, or a photograph on the map.",
+      "Don't add a hard offset shadow. The dock's soft drop is the only box shadow.",
+      "Don't set a typeface other than Sora for titles and metrics, or other than Manrope for UI text."
+    ]
+  }
+}

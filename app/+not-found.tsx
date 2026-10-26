@@ -2,11 +2,12 @@ import { router } from "expo-router";
 import { View } from "react-native";
 
 import { ScreenState } from "@/components/ui/ScreenState";
-import { theme } from "@/constants/theme";
+import { useTheme } from "@/providers/ThemeProvider";
 
 export default function NotFound() {
+  const { colors } = useTheme();
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg, justifyContent: "center" }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center", paddingHorizontal: 24 }}>
       <ScreenState
         kind="empty"
         title="This screen is not on the map"

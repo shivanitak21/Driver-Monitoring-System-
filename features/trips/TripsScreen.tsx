@@ -1,15 +1,15 @@
 import { useMemo } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 
 import { Page } from "@/components/layout/Page";
 import { RideMap } from "@/components/map/RideMap";
+import { TripHistoryCard } from "@/components/trips/TripHistoryCard";
 import { AppText } from "@/components/ui/AppText";
-import { StatusPill } from "@/components/ui/ScoreRing";
 import { rideDate } from "@/constants/format";
-import { theme } from "@/constants/theme";
 import { pastTrips } from "@/data/fleet";
 import { routeLine, shiftLine } from "@/data/route";
+import { useTheme } from "@/providers/ThemeProvider";
 import { rideMeta, tripHeadline, useRideStore, useSafetyIndex } from "@/stores/useRideStore";
 
 export function TripsScreen() {
@@ -25,10 +25,11 @@ export function TripsScreen() {
   const headline = tripHeadline(leg, local);
   const route = useMemo(() => shiftLine(routeLine, routeShift), [routeShift]);
   const loggedKm = pastTrips.reduce((sum, trip) => sum + trip.distanceKm, 0);
+  const { colors } = useTheme();
 
   return (
-    <Page title="Trips">
-      <View style={styles.map}>
+    <Page title="Trips" subtitle="This ride and the ones kept on the phone">
+      <View style={[styles.map, { borderColor: colors.line, backgroundColor: colors.mapBg }]}>
         <RideMap
           route={route}
           trail={trail}
@@ -41,35 +42,33 @@ export function TripsScreen() {
           onPan={() => undefined}
           onPressVehicle={() => router.push(`/trip/${rideMeta.tripId}`)}
         />
-        <View style={styles.mapTag} pointerEvents="none">
+        <View style={[styles.mapTag, { backgroundColor: colors.glass }]} pointerEvents="none">
           <AppText variant="caption">Live</AppText>
         </View>
       </View>
 
       <View style={styles.metrics}>
         <Metric label="ETA" value={`${eta} min`} />
-        <Metric label="Speed" value={`${speed}`} />
+        <Metric label="Speed" value={`${speed} km/h`} />
         <Metric label="Logged" value={`${loggedKm.toFixed(0)} km`} />
       </View>
 
-      <Pressable testID="live-trip-card" onPress={() => router.push(`/trip/${rideMeta.tripId}`)} style={styles.row}>
-        <View style={styles.flex}>
-          <AppText variant="strong">{headline.to}</AppText>
-          <AppText variant="caption">{rideMeta.passenger.name}</AppText>
-        </View>
-        <StatusPill status={safety.status} />
-      </Pressable>
+      <TripHistoryCard
+        testID="live-trip-card"
+        title={headline.to}
+        meta={rideMeta.passenger.name}
+        status={safety.status}
+        onPress={() => router.push(`/trip/${rideMeta.tripId}`)}
+      />
 
       {pastTrips.map((trip) => (
-        <Pressable key={trip.id} onPress={() => router.push(`/trip/${trip.id}`)} style={styles.row}>
-          <View style={styles.flex}>
-            <AppText variant="strong">{trip.destinationLabel}</AppText>
-            <AppText variant="caption">
-              {rideDate(trip.startedAt)} · {trip.distanceKm.toFixed(1)} km
-            </AppText>
-          </View>
-          <StatusPill status={trip.safetyStatus} />
-        </Pressable>
+        <TripHistoryCard
+          key={trip.id}
+          title={trip.destinationLabel}
+          meta={`${rideDate(trip.startedAt)} · ${trip.distanceKm.toFixed(1)} km`}
+          status={trip.safetyStatus}
+          onPress={() => router.push(`/trip/${trip.id}`)}
+        />
       ))}
     </Page>
   );
@@ -79,7 +78,9 @@ function Metric({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.metric}>
       <AppText variant="label">{label}</AppText>
-      <AppText variant="strong">{value}</AppText>
+      <AppText variant="metric" style={{ fontSize: 20 }}>
+        {value}
+      </AppText>
     </View>
   );
 }
@@ -87,41 +88,25 @@ function Metric({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   map: {
     height: 220,
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: "hidden",
-    marginTop: 8,
     borderWidth: 1,
-    borderColor: theme.line,
-    backgroundColor: theme.bgSoft,
   },
   mapTag: {
     position: "absolute",
     left: 12,
     top: 12,
-    backgroundColor: "rgba(0,0,0,0.72)",
-    borderRadius: 12,
+    borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   metrics: {
     flexDirection: "row",
-    gap: 8,
-    marginTop: 16,
+    gap: 12,
+    marginTop: 18,
     marginBottom: 8,
   },
   metric: {
-    flex: 1,
-    gap: 2,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: theme.line,
-  },
-  flex: {
     flex: 1,
     gap: 2,
   },

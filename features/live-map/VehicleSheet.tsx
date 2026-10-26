@@ -9,7 +9,7 @@ import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { vehiclePhotos } from "@/data/photos";
 import { vehicleProfile } from "@/data/fleet";
-import { theme } from "@/constants/theme";
+import { useTheme } from "@/providers/ThemeProvider";
 import { useRideStore, useSafetyIndex } from "@/stores/useRideStore";
 
 type Props = {
@@ -21,6 +21,7 @@ export function VehicleSheet({ sheetRef }: Props) {
   const { width } = useWindowDimensions();
   const safety = useSafetyIndex();
   const speed = useRideStore((state) => state.speedKmh);
+  const { colors } = useTheme();
   const renderBackdrop = useCallback(
     (props: BottomSheetBackdropProps) => (
       <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.55} />
@@ -35,11 +36,10 @@ export function VehicleSheet({ sheetRef }: Props) {
       enableDynamicSizing={false}
       enablePanDownToClose
       backdropComponent={renderBackdrop}
-      backgroundStyle={styles.sheet}
-      handleIndicatorStyle={styles.handle}
+      backgroundStyle={{ backgroundColor: colors.bgRaised, borderTopLeftRadius: 28, borderTopRightRadius: 28 }}
+      handleIndicatorStyle={{ backgroundColor: colors.lineStrong, width: 42 }}
     >
       <BottomSheetScrollView contentContainerStyle={styles.content}>
-        <AppText variant="label">Vehicle</AppText>
         <AppText variant="title" style={styles.name}>
           {vehicleProfile.name}
         </AppText>
@@ -56,7 +56,7 @@ export function VehicleSheet({ sheetRef }: Props) {
               }}
               style={{ width: width * 0.72 }}
             >
-              <Image source={photo.source} style={styles.photo} contentFit="cover" transition={200} />
+              <Image source={photo.source} style={[styles.photo, { backgroundColor: colors.bgSoft }]} contentFit="cover" transition={200} />
               <AppText variant="caption" style={styles.caption}>
                 {photo.caption}
               </AppText>
@@ -81,8 +81,9 @@ export function VehicleSheet({ sheetRef }: Props) {
 }
 
 function Stat({ label, value, unit }: { label: string; value: string; unit: string }) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.stat}>
+    <View style={[styles.stat, { backgroundColor: colors.bg, borderColor: colors.line }]}>
       <AppText variant="label">{label}</AppText>
       <AppText variant="metric">{value}</AppText>
       <AppText variant="caption">{unit}</AppText>
@@ -91,15 +92,6 @@ function Stat({ label, value, unit }: { label: string; value: string; unit: stri
 }
 
 const styles = StyleSheet.create({
-  sheet: {
-    backgroundColor: theme.bgRaised,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-  },
-  handle: {
-    backgroundColor: "rgba(243,240,232,0.28)",
-    width: 42,
-  },
   content: {
     paddingHorizontal: 20,
     paddingBottom: 36,
@@ -115,7 +107,6 @@ const styles = StyleSheet.create({
   photo: {
     height: 180,
     borderRadius: 20,
-    backgroundColor: theme.bgSoft,
   },
   caption: {
     marginTop: 8,
@@ -126,11 +117,9 @@ const styles = StyleSheet.create({
   },
   stat: {
     flex: 1,
-    backgroundColor: theme.bg,
     borderRadius: 18,
     padding: 12,
     borderWidth: 1,
-    borderColor: theme.line,
     gap: 2,
   },
 });

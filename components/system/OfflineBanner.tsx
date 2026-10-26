@@ -2,7 +2,7 @@ import { useNetworkState } from "expo-network";
 import { StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/ui/AppText";
-import { theme } from "@/constants/theme";
+import { useTheme } from "@/providers/ThemeProvider";
 import { useRideStore } from "@/stores/useRideStore";
 
 export function useOffline() {
@@ -13,10 +13,11 @@ export function useOffline() {
 
 export function OfflineBanner() {
   const offline = useOffline();
+  const { colors } = useTheme();
   if (!offline) return null;
   return (
-    <View style={styles.banner} testID="offline-banner">
-      <AppText variant="caption" style={styles.text}>
+    <View style={[styles.banner, { borderColor: colors.line, backgroundColor: colors.glass }]} testID="offline-banner">
+      <AppText variant="caption" style={{ color: colors.ink }}>
         Offline
       </AppText>
     </View>
@@ -25,14 +26,10 @@ export function OfflineBanner() {
 
 const styles = StyleSheet.create({
   banner: {
-    borderRadius: 14,
+    alignSelf: "flex-start",
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: theme.line,
-    backgroundColor: "rgba(0,0,0,0.72)",
     paddingHorizontal: 12,
     paddingVertical: 8,
-  },
-  text: {
-    color: theme.ink,
   },
 });

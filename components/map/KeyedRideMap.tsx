@@ -3,8 +3,11 @@ import { StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
 
 import { buildGoogleMapHtml } from "@/components/map/googleMapDocument";
+import { buildTileMapHtml } from "@/components/map/tileMapDocument";
 import type { RideMapProps } from "@/components/map/types";
 import { ScreenState } from "@/components/ui/ScreenState";
+import { useReduceMotion } from "@/hooks/useReduceMotion";
+import { useTheme } from "@/providers/ThemeProvider";
 
 type Props = RideMapProps & { apiKey: string };
 
@@ -22,22 +25,29 @@ export function KeyedRideMap({
   onPressVehicle,
 }: Props) {
   const webRef = useRef<WebView>(null);
-  const [failed, setFailed] = useState(false);
-  const regionKey = `${position.latitude.toFixed(1)},${position.longitude.toFixed(1)}`;
+  const [source, setSource] = useState<"google" | "tiles">("google");
+  const [broken, setBroken] = useState(false);
+  const { scheme, colors } = useTheme();
+  const reduceMotion = useReduceMotion();
+  const regionKey = `${position.latitude.toFixed(1)},${position.longitude.toFixed(1)}-${scheme}`;
   const html = useMemo(
     () =>
-      buildGoogleMapHtml({
-        apiKey,
-        route,
-        origin,
-        destination,
-        position,
-        heading,
-        trail,
-        deviceFix,
-        follow,
-      }),
-    [apiKey, regionKey],
+      source === "tiles"
+        ? buildTileMapHtml({ route, origin, destination, position, heading, trail, deviceFix, follow, scheme, reduceMotion })
+        : buildGoogleMapHtml({
+            apiKey,
+            route,
+            origin,
+            destination,
+            position,
+            heading,
+            trail,
+            deviceFix,
+            follow,
+            scheme,
+            reduceMotion,
+          }),
+    [source, apiKey, regionKey, scheme, reduceMotion],
   );
 
   const latest = useRef({ route, position, heading, trail, follow, deviceFix });
@@ -45,29 +55,26 @@ export function KeyedRideMap({
 
   const push = useCallback(() => {
     const payload = JSON.stringify(latest.current);
-    webRef.current?.injectJavaScript(`window.updateRide && window.updateRide(${JSON.stringify(payload)}); true;`);
+    webRef.current?.injectJavaScript(`window.updateRide && window.updateRide(${payload}); true;`);
   }, []);
 
   useEffect(() => {
     push();
   }, [route, position, heading, trail, follow, deviceFix, push]);
 
-  if (failed) {
+  if (broken) {
     return (
-      <View style={styles.fill}>
-        <ScreenState
-          kind="error"
-          title="The map did not open"
-          body="Google rejected this Maps key. Enable the Maps JavaScript API for it, then reload VMS."
-        />
+      <View style={[styles.fill, { backgroundColor: colors.mapBg }]}>
+        <ScreenState kind="error" title="The map did not open" body="The street map could not be loaded. Check the connection, then reload VMS." />
       </View>
     );
   }
 
   return (
-    <View style={styles.fill}>
+    <View style={[styles.fill, { backgroundColor: colors.mapBg }]}>
       <WebView
-        key={regionKey}
+        key={`${regionKey}-${source}`}
+        containerStyle={{ backgroundColor: colors.mapBg }}
         ref={webRef}
         testID="ride-map"
         style={styles.fill}
@@ -83,13 +90,16 @@ export function KeyedRideMap({
         overScrollMode="never"
         androidLayerType="hardware"
         onLoadEnd={push}
-        onError={() => setFailed(true)}
+        onError={() => {
+          if (source === "google") setSource("tiles");
+          else setBroken(true);
+        }}
         onMessage={(event) => {
           try {
             const message = JSON.parse(event.nativeEvent.data) as { type?: string };
             if (message.type === "pan") onPan();
             if (message.type === "vehicle") onPressVehicle();
-            if (message.type === "auth") setFailed(true);
+            if (message.type === "auth") setSource("tiles");
           } catch {
             // Page noise, not a map event.
           }
@@ -102,6 +112,6 @@ export function KeyedRideMap({
 const styles = StyleSheet.create({
   fill: {
     flex: 1,
-    backgroundColor: "#07080A",
+    backgroundColor: "transparent",
   },
 });

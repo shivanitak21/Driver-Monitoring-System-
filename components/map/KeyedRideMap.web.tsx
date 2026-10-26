@@ -4,8 +4,10 @@ import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { unstable_createElement } from "react-native-web";
 
 import { buildGoogleMapHtml } from "@/components/map/googleMapDocument";
+import { buildTileMapHtml } from "@/components/map/tileMapDocument";
 import type { RideMapProps } from "@/components/map/types";
-import { ScreenState } from "@/components/ui/ScreenState";
+import { useReduceMotion } from "@/hooks/useReduceMotion";
+import { useTheme } from "@/providers/ThemeProvider";
 
 type Props = RideMapProps & { apiKey: string };
 type FrameElement = HTMLIFrameElement;
@@ -24,25 +26,31 @@ export function KeyedRideMap({
   onPressVehicle,
 }: Props) {
   const frameRef = useRef<FrameElement | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [source, setSource] = useState<"google" | "tiles">("google");
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const { scheme, colors } = useTheme();
+  const reduceMotion = useReduceMotion();
   const latest = useRef({ route, position, heading, trail, follow, deviceFix });
   latest.current = { route, position, heading, trail, follow, deviceFix };
-  const regionKey = `${position.latitude.toFixed(1)},${position.longitude.toFixed(1)}`;
+  const regionKey = `${position.latitude.toFixed(1)},${position.longitude.toFixed(1)}-${scheme}`;
   const html = useMemo(
     () =>
-      buildGoogleMapHtml({
-        apiKey,
-        route,
-        origin,
-        destination,
-        position,
-        heading,
-        trail,
-        deviceFix,
-        follow,
-      }),
-    [apiKey, regionKey],
+      source === "tiles"
+        ? buildTileMapHtml({ route, origin, destination, position, heading, trail, deviceFix, follow, scheme, reduceMotion })
+        : buildGoogleMapHtml({
+            apiKey,
+            route,
+            origin,
+            destination,
+            position,
+            heading,
+            trail,
+            deviceFix,
+            follow,
+            scheme,
+            reduceMotion,
+          }),
+    [source, apiKey, regionKey, scheme, reduceMotion],
   );
 
   const push = useCallback(() => {
@@ -59,23 +67,11 @@ export function KeyedRideMap({
       const message = event.data as { type?: string };
       if (message?.type === "pan") onPan();
       if (message?.type === "vehicle") onPressVehicle();
-      if (message?.type === "auth") setFailed(true);
+      if (message?.type === "auth") setSource("tiles");
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [onPan, onPressVehicle]);
-
-  if (failed) {
-    return (
-      <View style={styles.fill}>
-        <ScreenState
-          kind="error"
-          title="The map did not open"
-          body="Google rejected this Maps key. Enable the Maps JavaScript API for it, then reload VMS."
-        />
-      </View>
-    );
-  }
 
   const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -83,16 +79,16 @@ export function KeyedRideMap({
   };
 
   return (
-    <View style={styles.fill} onLayout={onLayout}>
+    <View style={[styles.fill, { backgroundColor: colors.mapBg }]} onLayout={onLayout}>
       {size.height > 0
         ? unstable_createElement("iframe", {
-            key: regionKey,
+            key: `${regionKey}-${source}`,
             ref: (node: FrameElement | null) => {
               frameRef.current = node;
             },
             title: "Live map",
             srcDoc: html,
-            style: { width: size.width, height: size.height, borderWidth: 0, backgroundColor: "#07080A" },
+            style: { width: size.width, height: size.height, borderWidth: 0, backgroundColor: colors.mapBg },
             onLoad: push,
           })
         : null}

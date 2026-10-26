@@ -1,9 +1,10 @@
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import * as Haptics from "expo-haptics";
 
 import { AppText } from "@/components/ui/AppText";
-import { theme } from "@/constants/theme";
+import { radius } from "@/constants/theme";
+import { useTheme } from "@/providers/ThemeProvider";
 
 type Tone = "lime" | "ghost" | "danger" | "quiet";
 
@@ -16,6 +17,44 @@ type Props = {
 };
 
 export function Button({ label, onPress, tone = "lime", disabled = false, testID }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        base: {
+          minHeight: 48,
+          borderRadius: radius.md,
+          alignItems: "center",
+          justifyContent: "center",
+          paddingHorizontal: 16,
+        },
+        lime: { backgroundColor: colors.lime },
+        ghost: {
+          backgroundColor: "transparent",
+          borderWidth: 1,
+          borderColor: colors.lineStrong,
+        },
+        danger: { backgroundColor: colors.danger },
+        quiet: { backgroundColor: colors.bgSoft },
+        disabled: { opacity: 0.4 },
+        label: { fontSize: 15 },
+        limeLabel: { color: colors.limeInk },
+        dangerLabel: { color: colors.onDanger },
+        ghostLabel: { color: colors.ink },
+        icon: {
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.glass,
+          borderWidth: 1,
+          borderColor: colors.line,
+        },
+      }),
+    [colors],
+  );
+
   return (
     <Pressable
       testID={testID}
@@ -29,7 +68,7 @@ export function Button({ label, onPress, tone = "lime", disabled = false, testID
         styles.base,
         styles[tone],
         disabled && styles.disabled,
-        pressed && !disabled && styles.pressed,
+        pressed && !disabled && { opacity: 0.82, transform: [{ scale: 0.98 }] },
       ]}
     >
       <AppText
@@ -38,7 +77,7 @@ export function Button({ label, onPress, tone = "lime", disabled = false, testID
           styles.label,
           tone === "lime" && styles.limeLabel,
           tone === "danger" && styles.dangerLabel,
-          tone === "ghost" && styles.ghostLabel,
+          (tone === "ghost" || tone === "quiet") && styles.ghostLabel,
         ]}
       >
         {label}
@@ -58,6 +97,24 @@ export function IconButton({
   children: ReactNode;
   testID?: string;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        icon: {
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.glass,
+          borderWidth: 1,
+          borderColor: colors.line,
+        },
+      }),
+    [colors],
+  );
+
   return (
     <Pressable
       testID={testID}
@@ -67,61 +124,9 @@ export function IconButton({
         void Haptics.selectionAsync();
         onPress();
       }}
-      style={({ pressed }) => [styles.icon, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.icon, pressed && { opacity: 0.82, transform: [{ scale: 0.96 }] }]}
     >
       <View>{children}</View>
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  base: {
-    minHeight: 48,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 16,
-  },
-  lime: {
-    backgroundColor: theme.lime,
-  },
-  ghost: {
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: theme.lineStrong,
-  },
-  danger: {
-    backgroundColor: theme.danger,
-  },
-  quiet: {
-    backgroundColor: theme.bgSoft,
-  },
-  disabled: {
-    opacity: 0.4,
-  },
-  pressed: {
-    opacity: 0.72,
-  },
-  label: {
-    fontSize: 14,
-  },
-  limeLabel: {
-    color: theme.limeInk,
-  },
-  dangerLabel: {
-    color: "#1A0907",
-  },
-  ghostLabel: {
-    color: theme.ink,
-  },
-  icon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(10,12,14,0.78)",
-    borderWidth: 1,
-    borderColor: theme.line,
-  },
-});

@@ -3,20 +3,20 @@ import * as Haptics from "expo-haptics";
 
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
-import { theme } from "@/constants/theme";
+import { useTheme } from "@/providers/ThemeProvider";
 import { useRideStore } from "@/stores/useRideStore";
 
 export function SosConfirm() {
   const open = useRideStore((state) => state.sosPrompt);
   const cancel = useRideStore((state) => state.cancelSos);
   const confirm = useRideStore((state) => state.confirmSos);
+  const { colors } = useTheme();
   if (!open) return null;
 
   return (
-    <View style={styles.backdrop} testID="sos-confirm">
+    <View style={[styles.backdrop, { backgroundColor: colors.scrim }]} testID="sos-confirm">
       <Pressable style={StyleSheet.absoluteFill} onPress={cancel} />
-      <View style={styles.card}>
-        <AppText variant="label">Incident</AppText>
+      <View style={[styles.card, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}>
         <AppText variant="title">Raise SOS for this ride</AppText>
         <AppText variant="body">
           People with sharing on are notified, and this ride is marked Emergency.
@@ -45,16 +45,13 @@ export function SosConfirm() {
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(0,0,0,0.62)",
     justifyContent: "flex-end",
     padding: 16,
     zIndex: 30,
   },
   card: {
-    backgroundColor: theme.bgRaised,
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: theme.line,
     padding: 20,
     gap: 10,
     marginBottom: 12,

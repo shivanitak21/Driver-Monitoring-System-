@@ -1,7 +1,8 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/ui/AppText";
-import { theme } from "@/constants/theme";
+import { useTheme } from "@/providers/ThemeProvider";
 
 type Kind = "loading" | "empty" | "offline" | "denied" | "error";
 
@@ -13,22 +14,49 @@ type Props = {
   onAction?: () => void;
 };
 
-const kicker: Record<Kind, string> = {
-  loading: "Loading",
-  empty: "Empty",
-  offline: "Offline",
-  denied: "Permission",
-  error: "Error",
-};
-
 export function ScreenState({ kind, title, body, actionLabel, onAction }: Props) {
+  const { colors } = useTheme();
+  const mark =
+    kind === "error" ? colors.danger : kind === "loading" ? colors.signal : kind === "offline" ? colors.amber : colors.inkFaint;
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        wrap: {
+          alignItems: "flex-start",
+          paddingVertical: 28,
+          paddingHorizontal: 4,
+          gap: 8,
+        },
+        mark: {
+          width: 28,
+          height: 3,
+          borderRadius: 2,
+          marginBottom: 6,
+        },
+        body: {
+          maxWidth: 320,
+        },
+        action: {
+          marginTop: 12,
+          minHeight: 44,
+          paddingHorizontal: 16,
+          borderRadius: 14,
+          backgroundColor: colors.lime,
+          alignItems: "center",
+          justifyContent: "center",
+        },
+        actionLabel: {
+          color: colors.limeInk,
+          fontSize: 15,
+        },
+      }),
+    [colors],
+  );
+
   return (
     <View style={styles.wrap} testID={`state-${kind}`}>
-      <View style={[styles.mark, kind === "error" && styles.markDanger, kind === "loading" && styles.markLime]} />
-      <AppText variant="label">{kicker[kind]}</AppText>
-      <AppText variant="title" style={styles.title}>
-        {title}
-      </AppText>
+      <View style={[styles.mark, { backgroundColor: mark }]} />
+      <AppText variant="title">{title}</AppText>
       {body ? (
         <AppText variant="body" style={styles.body}>
           {body}
@@ -44,43 +72,3 @@ export function ScreenState({ kind, title, body, actionLabel, onAction }: Props)
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wrap: {
-    alignItems: "flex-start",
-    padding: 24,
-    gap: 8,
-  },
-  mark: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.amber,
-    marginBottom: 8,
-  },
-  markDanger: {
-    backgroundColor: theme.danger,
-  },
-  markLime: {
-    backgroundColor: theme.lime,
-  },
-  title: {
-    marginTop: 4,
-  },
-  body: {
-    maxWidth: 320,
-  },
-  action: {
-    marginTop: 12,
-    minHeight: 44,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    backgroundColor: theme.lime,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  actionLabel: {
-    color: theme.limeInk,
-    fontSize: 14,
-  },
-});

@@ -5,9 +5,11 @@ import Svg, { Circle, Line, Polyline } from "react-native-svg";
 import { CarGlyph } from "@/components/map/CarGlyph";
 import { KeyedRideMap } from "@/components/map/KeyedRideMap";
 import type { RideMapProps } from "@/components/map/types";
+import { useSmoothPose } from "@/components/map/useSmoothPose";
 import { AppText } from "@/components/ui/AppText";
 import { googleMapsApiKey } from "@/constants/maps";
-import { theme } from "@/constants/theme";
+import { useReduceMotion } from "@/hooks/useReduceMotion";
+import { useTheme } from "@/providers/ThemeProvider";
 import type { Coordinate } from "@/types/domain";
 
 function boundsOf(points: Coordinate[]) {
@@ -30,11 +32,14 @@ export function RideMap(props: RideMapProps) {
 function PreviewMap({ route, trail, position, heading, destination, deviceFix, onPressVehicle }: RideMapProps) {
   const { width, height } = useWindowDimensions();
   const bounds = useMemo(() => boundsOf(route), [route]);
+  const { colors, scheme } = useTheme();
+  const reduceMotion = useReduceMotion();
+  const pose = useSmoothPose(position, heading, reduceMotion);
 
   const project = (point: Coordinate) => {
-    const padX = 48;
-    const padTop = 120;
-    const padBottom = 280;
+    const padX = 36;
+    const padTop = 88;
+    const padBottom = 220;
     const spanLng = Math.max(bounds.maxLng - bounds.minLng, 0.0001);
     const spanLat = Math.max(bounds.maxLat - bounds.minLat, 0.0001);
     return {
@@ -45,38 +50,24 @@ function PreviewMap({ route, trail, position, heading, destination, deviceFix, o
 
   const routePoints = route.map(project).map((point) => `${point.x},${point.y}`).join(" ");
   const trailPoints = trail.map(project).map((point) => `${point.x},${point.y}`).join(" ");
-  const car = project(position);
+  const car = project(pose);
   const dest = project(destination);
   const phone = deviceFix ? project(deviceFix) : null;
+  const grid = scheme === "light" ? "rgba(23,25,29,0.06)" : "rgba(245,246,247,0.06)";
+  const road = scheme === "light" ? "rgba(23,25,29,0.28)" : "rgba(245,246,247,0.38)";
 
   return (
-    <View style={styles.fill}>
+    <View style={[styles.fill, { backgroundColor: colors.mapBg }]}>
       <Svg width={width} height={height}>
         {Array.from({ length: 8 }).map((_, index) => (
-          <Line
-            key={`v-${index}`}
-            x1={(width / 8) * index}
-            y1={0}
-            x2={(width / 8) * index}
-            y2={height}
-            stroke="rgba(243,240,232,0.05)"
-          />
+          <Line key={`v-${index}`} x1={(width / 8) * index} y1={0} x2={(width / 8) * index} y2={height} stroke={grid} />
         ))}
         {Array.from({ length: 12 }).map((_, index) => (
-          <Line
-            key={`h-${index}`}
-            x1={0}
-            y1={(height / 12) * index}
-            x2={width}
-            y2={(height / 12) * index}
-            stroke="rgba(243,240,232,0.04)"
-          />
+          <Line key={`h-${index}`} x1={0} y1={(height / 12) * index} x2={width} y2={(height / 12) * index} stroke={grid} />
         ))}
-        <Polyline points={routePoints} fill="none" stroke="rgba(243,240,232,0.38)" strokeWidth={3} />
-        {trail.length > 1 ? (
-          <Polyline points={trailPoints} fill="none" stroke={theme.lime} strokeWidth={4} />
-        ) : null}
-        <Circle cx={dest.x} cy={dest.y} r={6} fill={theme.cyan} />
+        <Polyline points={routePoints} fill="none" stroke={road} strokeWidth={3} />
+        {trail.length > 1 ? <Polyline points={trailPoints} fill="none" stroke={colors.signal} strokeWidth={4} /> : null}
+        <Circle cx={dest.x} cy={dest.y} r={6} fill={colors.cyan} />
         {phone ? <Circle cx={phone.x} cy={phone.y} r={5} fill="#7EB6FF" /> : null}
       </Svg>
       <Pressable
@@ -86,15 +77,15 @@ function PreviewMap({ route, trail, position, heading, destination, deviceFix, o
         style={[
           styles.car,
           {
-            left: car.x - 42,
-            top: car.y - 42,
-            transform: [{ rotate: `${heading}deg` }],
+            left: car.x - 28,
+            top: car.y - 28,
+            transform: [{ rotate: `${pose.heading}deg` }],
           },
         ]}
       >
-        <CarGlyph />
+        <CarGlyph width={52} height={52} />
       </Pressable>
-      <View style={styles.caption}>
+      <View style={styles.caption} pointerEvents="none">
         <AppText variant="caption">Route preview on web. iOS uses Apple Maps. Android uses Google Maps.</AppText>
       </View>
     </View>
@@ -104,19 +95,18 @@ function PreviewMap({ route, trail, position, heading, destination, deviceFix, o
 const styles = StyleSheet.create({
   fill: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: "#101216",
   },
   car: {
     position: "absolute",
-    width: 84,
-    height: 84,
+    width: 56,
+    height: 56,
     alignItems: "center",
     justifyContent: "center",
   },
   caption: {
     position: "absolute",
     left: 20,
-    right: 88,
-    top: 92,
+    right: 20,
+    top: 72,
   },
 });

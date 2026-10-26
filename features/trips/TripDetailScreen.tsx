@@ -2,15 +2,16 @@ import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 
+import { AlertTimelineItem } from "@/components/alerts/AlertTimelineItem";
 import { Page } from "@/components/layout/Page";
 import { RideMap } from "@/components/map/RideMap";
 import { AppText } from "@/components/ui/AppText";
 import { ScreenState } from "@/components/ui/ScreenState";
 import { StatusPill } from "@/components/ui/ScoreRing";
 import { clock, rideDate } from "@/constants/format";
-import { theme } from "@/constants/theme";
 import { LIVE_TRIP_ID, pastTrips } from "@/data/fleet";
 import { routeLine, shiftLine } from "@/data/route";
+import { useTheme } from "@/providers/ThemeProvider";
 import { rideMeta, tripHeadline, useRideStore, useSafetyIndex } from "@/stores/useRideStore";
 
 export function TripDetailScreen() {
@@ -26,16 +27,14 @@ export function TripDetailScreen() {
   const shareLink = useRideStore((state) => state.shareLink);
   const guardians = useRideStore((state) => state.guardians);
   const routeShift = useRideStore((state) => state.routeShift);
+  const acknowledge = useRideStore((state) => state.acknowledge);
   const liveRoute = useMemo(() => shiftLine(routeLine, routeShift), [routeShift]);
+  const { colors } = useTheme();
 
   if (id !== LIVE_TRIP_ID && !pastTrips.some((trip) => trip.id === id)) {
     return (
-      <Page kicker="Trip" title="Missing ride" back>
-        <ScreenState
-          kind="error"
-          title="This trip is not on the phone"
-          body="Open a ride from the Trips list."
-        />
+      <Page title="Missing ride" back>
+        <ScreenState kind="error" title="This trip is not on the phone" body="Open a ride from the Trips list." />
       </Page>
     );
   }
@@ -50,8 +49,13 @@ export function TripDetailScreen() {
   const sharing = guardians.filter((guardian) => guardian.sharing);
 
   return (
-    <Page title={live ? headline.to : past.destinationLabel} kicker={live ? "Live" : rideDate(past.startedAt)} back>
-      <View style={styles.map}>
+    <Page
+      title={live ? headline.to : past.destinationLabel}
+      subtitle={live ? "In progress" : rideDate(past.startedAt)}
+      back
+      action={<StatusPill status={live ? safety.status : past.safetyStatus} />}
+    >
+      <View style={[styles.map, { borderColor: colors.line, backgroundColor: colors.mapBg }]}>
         <RideMap
           route={route}
           trail={live ? trail : route}
@@ -64,16 +68,11 @@ export function TripDetailScreen() {
           onPan={() => undefined}
           onPressVehicle={() => undefined}
         />
-        <View style={styles.mapTag}>
-          <AppText variant="caption">Route</AppText>
-        </View>
       </View>
       <View style={styles.block}>
-        <View style={styles.row}>
-          <AppText variant="label">{live ? "In progress" : past.status}</AppText>
-          <StatusPill status={live ? safety.status : past.safetyStatus} />
-        </View>
-        <AppText variant="title">{live ? rideMeta.passenger.name : "Meera Shah"}</AppText>
+        <AppText variant="title" style={{ fontSize: 22 }}>
+          {live ? rideMeta.passenger.name : rideMeta.passenger.name}
+        </AppText>
         <View style={styles.metrics}>
           <Metric label="Speed" value={live ? `${speed} km/h` : `${past.distanceKm.toFixed(1)} km`} />
           <Metric label={live ? "ETA" : "From"} value={live ? `${eta} min` : past.originLabel} />
@@ -83,19 +82,20 @@ export function TripDetailScreen() {
           {live ? shareLink : "Share closed"}
         </AppText>
       </View>
-      <AppText variant="label" style={styles.section}>
+      <AppText variant="strong" style={styles.section}>
         Events
       </AppText>
       {tripAlerts.length === 0 ? (
         <ScreenState kind="empty" title="No events" body="Nothing has been recorded on this ride." />
       ) : (
-        tripAlerts.map((alert) => (
-          <View key={alert.id} style={styles.event}>
-            <AppText variant="strong">{alert.title}</AppText>
-            <AppText variant="caption">
-              {clock(alert.at)} · {alert.locationLabel} · {alert.acknowledged ? "Acknowledged" : "Open"}
-            </AppText>
-          </View>
+        tripAlerts.map((alert, index) => (
+          <AlertTimelineItem
+            key={alert.id}
+            alert={alert}
+            timeLabel={`${clock(alert.at)} · ${alert.locationLabel}`}
+            showLine={index < tripAlerts.length - 1}
+            onAcknowledge={() => acknowledge(alert.id)}
+          />
         ))
       )}
     </Page>
@@ -116,48 +116,25 @@ function Metric({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   map: {
     height: 280,
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: "hidden",
-    marginTop: 8,
     borderWidth: 1,
-    borderColor: theme.line,
-    backgroundColor: "#121417",
-  },
-  mapTag: {
-    position: "absolute",
-    left: 12,
-    top: 12,
-    backgroundColor: "rgba(7,8,10,0.8)",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
   },
   block: {
-    marginTop: 16,
-    gap: 6,
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    marginTop: 18,
+    gap: 8,
   },
   metrics: {
     flexDirection: "row",
     gap: 8,
-    marginTop: 8,
+    marginTop: 4,
   },
   metric: {
     flex: 1,
     gap: 2,
   },
   section: {
-    marginTop: 22,
-    marginBottom: 10,
-  },
-  event: {
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: theme.line,
-    gap: 4,
+    marginTop: 28,
+    marginBottom: 12,
   },
 });
