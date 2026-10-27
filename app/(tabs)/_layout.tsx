@@ -7,7 +7,7 @@ export default function TabLayout() {
   const { colors } = useTheme();
   return (
     <Tabs
-      tabBar={(props) => <DockTabBar state={props.state} navigation={props.navigation} />}
+      tabBar={(props) => <DockTabBar {...props} />}
       screenOptions={{
         headerShown: false,
         sceneStyle: { backgroundColor: colors.bg },

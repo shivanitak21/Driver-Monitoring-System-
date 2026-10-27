@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Bell, Navigation, Route, Users, Video } from "@/components/ui/icons";
 import { router } from "expo-router";
+import type { BottomTabBarProps } from "expo-router/js-tabs";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -9,19 +10,6 @@ import { AppText } from "@/components/ui/AppText";
 import { Glass } from "@/components/ui/Glass";
 import { useTheme } from "@/providers/ThemeProvider";
 import { useRideStore } from "@/stores/useRideStore";
-
-type DockTabBarProps = {
-  state: {
-    index: number;
-    routes: Array<{ key: string; name: string; params?: object }>;
-  };
-  navigation: {
-    emit: (event: { type: "tabPress"; target: string; canPreventDefault: true }) => {
-      defaultPrevented: boolean;
-    };
-    navigate: (name: string, params?: object) => void;
-  };
-};
 
 const tabs: Record<string, { label: string; Icon: typeof Navigation }> = {
   index: { label: "Live", Icon: Navigation },
@@ -31,9 +19,8 @@ const tabs: Record<string, { label: string; Icon: typeof Navigation }> = {
   guardians: { label: "Family", Icon: Users },
 };
 
-export function DockTabBar({ state, navigation }: DockTabBarProps) {
+export function DockTabBar({ state, emitter, navigateToTab, insets }: BottomTabBarProps) {
   const openAlerts = useRideStore((store) => store.alerts.filter((alert) => !alert.acknowledged).length);
-  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(
     () =>
@@ -99,13 +86,13 @@ export function DockTabBar({ state, navigation }: DockTabBarProps) {
                   accessibilityLabel={item.label}
                   onPress={() => {
                     void Haptics.selectionAsync();
-                    const event = navigation.emit({
+                    const event = emitter.emit({
                       type: "tabPress",
                       target: route.key,
                       canPreventDefault: true,
                     });
                     if (!focused && !event.defaultPrevented) {
-                      navigation.navigate(route.name, route.params);
+                      navigateToTab(route.key);
                     }
                   }}
                   style={[styles.item, focused && styles.active]}
