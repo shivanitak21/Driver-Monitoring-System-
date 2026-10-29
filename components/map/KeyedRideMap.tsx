@@ -30,15 +30,28 @@ export function KeyedRideMap({
   const { scheme, colors } = useTheme();
   const reduceMotion = useReduceMotion();
   const regionKey = `${position.latitude.toFixed(1)},${position.longitude.toFixed(1)}-${scheme}`;
+  const mapOrigin = origin ?? position;
+  const mapDestination = destination ?? position;
   const html = useMemo(
     () =>
       source === "tiles"
-        ? buildTileMapHtml({ route, origin, destination, position, heading, trail, deviceFix, follow, scheme, reduceMotion })
+        ? buildTileMapHtml({
+            route,
+            origin: mapOrigin,
+            destination: mapDestination,
+            position,
+            heading,
+            trail,
+            deviceFix,
+            follow,
+            scheme,
+            reduceMotion,
+          })
         : buildGoogleMapHtml({
             apiKey,
             route,
-            origin,
-            destination,
+            origin: mapOrigin,
+            destination: mapDestination,
             position,
             heading,
             trail,

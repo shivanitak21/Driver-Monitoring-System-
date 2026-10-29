@@ -5,15 +5,18 @@ import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
 
 import { Page } from "@/components/layout/Page";
+import { ApiStatusBanner } from "@/components/system/ApiStatusBanner";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { ScreenState } from "@/components/ui/ScreenState";
 import { font } from "@/constants/theme";
 import { timeAgo } from "@/constants/format";
+import { useLiveApiRefresh } from "@/hooks/useLiveApiRefresh";
 import { useTheme } from "@/providers/ThemeProvider";
 import { useRideStore } from "@/stores/useRideStore";
 
 export function GuardiansScreen() {
+  useLiveApiRefresh("guardians");
   const guardians = useRideStore((state) => state.guardians);
   const notices = useRideStore((state) => state.notices);
   const toggleSharing = useRideStore((state) => state.toggleSharing);
@@ -21,18 +24,32 @@ export function GuardiansScreen() {
   const removeGuardian = useRideStore((state) => state.removeGuardian);
   const shareTrip = useRideStore((state) => state.shareTrip);
   const shareLink = useRideStore((state) => state.shareLink);
+  const liveMode = useRideStore((state) => state.liveMode);
+  const refreshing = useRideStore((state) => state.refreshing);
+  const refreshAll = useRideStore((state) => state.refreshAll);
+  const refreshGuardians = useRideStore((state) => state.refreshGuardians);
+  const refreshNotices = useRideStore((state) => state.refreshNotices);
+  const connectionError = useRideStore((state) => state.connectionError);
   const { colors } = useTheme();
   const [name, setName] = useState("");
   const [relationship, setRelationship] = useState("");
   const [phone, setPhone] = useState("");
   const [formError, setFormError] = useState("");
   const [invite, setInvite] = useState(false);
+  const [busy, setBusy] = useState(false);
   const sharing = guardians.filter((guardian) => guardian.sharing);
+
+  const onRefresh = () => {
+    if (!liveMode) return;
+    void Promise.all([refreshGuardians(), refreshNotices()]);
+  };
 
   return (
     <Page
       title="Family"
       subtitle={`${sharing.length} sharing this ride`}
+      refreshing={refreshing}
+      onRefresh={liveMode ? onRefresh : undefined}
       action={
         <Pressable
           testID="open-settings"
@@ -48,18 +65,42 @@ export function GuardiansScreen() {
         </Pressable>
       }
     >
+      <View style={{ marginBottom: 10 }}>
+        <ApiStatusBanner onRetry={() => void refreshAll()} />
+      </View>
+
       <View style={styles.summary}>
         <AppText variant="caption" numberOfLines={2}>
-          {shareLink}
+          {shareLink || "No share link yet"}
         </AppText>
-        <Button testID="refresh-share" label="Refresh link" tone="ghost" onPress={() => void shareTrip()} />
+        <Button
+          testID="refresh-share"
+          label="Refresh link"
+          tone="ghost"
+          onPress={() => {
+            setBusy(true);
+            void shareTrip()
+              .catch((error: Error) => setFormError(error.message))
+              .finally(() => setBusy(false));
+          }}
+        />
       </View>
+
+      {connectionError ? (
+        <AppText variant="caption" style={{ color: colors.dangerSoft, marginBottom: 8 }}>
+          {connectionError}
+        </AppText>
+      ) : null}
 
       {guardians.length === 0 ? (
         <ScreenState
           kind="empty"
           title="No guardians yet"
-          body="Add someone who should hear about this ride. Notices stay on this phone."
+          body={
+            liveMode
+              ? "Add someone who should hear about this ride. Notices come from the guardian API."
+              : "Add someone who should hear about this ride. Notices stay on this phone."
+          }
         />
       ) : (
         guardians.map((guardian) => (
@@ -70,18 +111,28 @@ export function GuardiansScreen() {
             <View style={styles.flex}>
               <AppText variant="strong">{guardian.name}</AppText>
               <AppText variant="caption">
-                {guardian.relationship}
-                {guardian.lastNotifiedAt ? ` · ${timeAgo(guardian.lastNotifiedAt)}` : ""}
+                {guardian.relationship || "Guardian"}
+                {guardian.phone ? ` · ${guardian.phone}` : ""}
               </AppText>
-              <Pressable onPress={() => removeGuardian(guardian.id)} accessibilityRole="button" hitSlop={8}>
-                <AppText variant="caption" style={{ color: colors.danger }}>
-                  Remove
-                </AppText>
-              </Pressable>
+              <AppText variant="caption" style={{ color: colors.inkFaint }}>
+                {guardian.lastNotifiedAt
+                  ? `Last notified ${timeAgo(guardian.lastNotifiedAt)}`
+                  : "Not notified yet"}
+                {guardian.sharing ? " · Sharing on" : " · Sharing off"}
+              </AppText>
+              {!liveMode ? (
+                <Pressable onPress={() => removeGuardian(guardian.id)} accessibilityRole="button" hitSlop={8}>
+                  <AppText variant="caption" style={{ color: colors.danger }}>
+                    Remove
+                  </AppText>
+                </Pressable>
+              ) : null}
             </View>
             <Switch
               value={guardian.sharing}
-              onValueChange={() => toggleSharing(guardian.id)}
+              onValueChange={() => {
+                void toggleSharing(guardian.id).catch((error: Error) => setFormError(error.message));
+              }}
               trackColor={{ true: colors.lime, false: colors.bgSoft }}
               thumbColor={guardian.sharing ? colors.limeInk : colors.bgRaised}
             />
@@ -105,35 +156,58 @@ export function GuardiansScreen() {
           ) : null}
           <Button
             testID="add-guardian"
-            label="Save"
+            label={busy ? "Saving…" : "Save"}
             onPress={() => {
-              if (!name.trim() || !relationship.trim() || !phone.trim()) {
+              if (!name.trim()) {
+                setFormError("Name is required.");
+                return;
+              }
+              if (!liveMode && (!relationship.trim() || !phone.trim())) {
                 setFormError("Name, relationship, and phone are required.");
                 return;
               }
-              addGuardian({ name, relationship, phone });
-              setName("");
-              setRelationship("");
-              setPhone("");
+              setBusy(true);
               setFormError("");
-              setInvite(false);
+              void addGuardian({ name, relationship, phone })
+                .then(() => {
+                  setName("");
+                  setRelationship("");
+                  setPhone("");
+                  setInvite(false);
+                })
+                .catch((error: Error) => setFormError(error.message))
+                .finally(() => setBusy(false));
             }}
           />
         </View>
       ) : null}
 
-      {notices.length === 0 ? null : (
-        <View style={styles.notices}>
-          {notices.map((notice) => (
+      <View style={styles.notices}>
+        <AppText variant="strong" style={{ marginBottom: 8 }}>
+          Notices
+        </AppText>
+        {notices.length === 0 ? (
+          <ScreenState
+            kind="empty"
+            title="No notices yet"
+            body={
+              liveMode
+                ? "SOS and share actions will write notices from the guardian API."
+                : "Notices stay on this phone."
+            }
+          />
+        ) : (
+          notices.map((notice) => (
             <View key={notice.id} style={[styles.notice, { borderTopColor: colors.line }]}>
               <AppText variant="strong">{notice.title}</AppText>
+              <AppText variant="caption">{notice.body}</AppText>
               <AppText variant="caption">
                 {timeAgo(notice.at)} · {notice.guardianNames.join(", ") || "No recipients"}
               </AppText>
             </View>
-          ))}
-        </View>
-      )}
+          ))
+        )}
+      </View>
     </Page>
   );
 }

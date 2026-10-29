@@ -70,9 +70,12 @@ const config: ExpoConfig = {
     typedRoutes: false,
   },
   extra: {
-    telemetryUrl: process.env.EXPO_PUBLIC_TELEMETRY_URL ?? "",
-    mqttUrl: process.env.EXPO_PUBLIC_MQTT_URL ?? "",
+    // Demo guardian API. Override with EXPO_PUBLIC_TELEMETRY_URL when needed.
+    telemetryUrl: (process.env.EXPO_PUBLIC_TELEMETRY_URL || "http://51.81.81.118:8000").trim(),
+    mqttUrl: (process.env.EXPO_PUBLIC_MQTT_URL ?? "").trim(),
     googleMapsApiKey: mapsKey ?? "",
+    defaultRideId: process.env.EXPO_PUBLIC_RIDE_ID || "ride-1842",
+    defaultDeviceId: process.env.EXPO_PUBLIC_DEVICE_ID || "orin-nano-01",
   },
 };
 

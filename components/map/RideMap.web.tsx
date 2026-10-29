@@ -31,7 +31,8 @@ export function RideMap(props: RideMapProps) {
 
 function PreviewMap({ route, trail, position, heading, destination, deviceFix, onPressVehicle }: RideMapProps) {
   const { width, height } = useWindowDimensions();
-  const bounds = useMemo(() => boundsOf(route), [route]);
+  const points = route.length > 0 ? route : [position];
+  const bounds = useMemo(() => boundsOf(points), [points]);
   const { colors, scheme } = useTheme();
   const reduceMotion = useReduceMotion();
   const pose = useSmoothPose(position, heading, reduceMotion);
@@ -51,7 +52,7 @@ function PreviewMap({ route, trail, position, heading, destination, deviceFix, o
   const routePoints = route.map(project).map((point) => `${point.x},${point.y}`).join(" ");
   const trailPoints = trail.map(project).map((point) => `${point.x},${point.y}`).join(" ");
   const car = project(pose);
-  const dest = project(destination);
+  const dest = destination ? project(destination) : null;
   const phone = deviceFix ? project(deviceFix) : null;
   const grid = scheme === "light" ? "rgba(23,25,29,0.06)" : "rgba(245,246,247,0.06)";
   const road = scheme === "light" ? "rgba(23,25,29,0.28)" : "rgba(245,246,247,0.38)";
@@ -65,9 +66,9 @@ function PreviewMap({ route, trail, position, heading, destination, deviceFix, o
         {Array.from({ length: 12 }).map((_, index) => (
           <Line key={`h-${index}`} x1={0} y1={(height / 12) * index} x2={width} y2={(height / 12) * index} stroke={grid} />
         ))}
-        <Polyline points={routePoints} fill="none" stroke={road} strokeWidth={3} />
+        {routePoints ? <Polyline points={routePoints} fill="none" stroke={road} strokeWidth={3} /> : null}
         {trail.length > 1 ? <Polyline points={trailPoints} fill="none" stroke={colors.signal} strokeWidth={4} /> : null}
-        <Circle cx={dest.x} cy={dest.y} r={6} fill={colors.cyan} />
+        {dest ? <Circle cx={dest.x} cy={dest.y} r={6} fill={colors.cyan} /> : null}
         {phone ? <Circle cx={phone.x} cy={phone.y} r={5} fill="#7EB6FF" /> : null}
       </Svg>
       <Pressable

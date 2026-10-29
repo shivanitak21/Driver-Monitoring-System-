@@ -1,3 +1,4 @@
+import type { GuardianApi } from "@/services/api/guardianApi";
 import type { Coordinate, DataOrigin } from "@/types/domain";
 
 export type MqttPublish = {
@@ -16,10 +17,15 @@ export type SosReceipt = {
   topic: string;
   origin: DataOrigin;
   note: string;
+  alertId?: string;
 };
 
 export type SosService = {
-  raise(input: { rideId: string; coordinate: Coordinate; passenger: string }): Promise<SosReceipt>;
+  raise(input: {
+    rideId: string;
+    coordinate: Coordinate;
+    passenger: string;
+  }): Promise<SosReceipt>;
 };
 
 export type GuardianNotifier = {
@@ -45,4 +51,6 @@ export type ServiceBundle = {
   sos: SosService;
   guardians: GuardianNotifier;
   cabin: CabinFeedService;
+  api: GuardianApi | null;
+  live: boolean;
 };

@@ -5,18 +5,27 @@ import { useLocalSearchParams } from "expo-router";
 import { AlertTimelineItem } from "@/components/alerts/AlertTimelineItem";
 import { Page } from "@/components/layout/Page";
 import { RideMap } from "@/components/map/RideMap";
+import { ApiStatusBanner } from "@/components/system/ApiStatusBanner";
 import { AppText } from "@/components/ui/AppText";
 import { ScreenState } from "@/components/ui/ScreenState";
 import { StatusPill } from "@/components/ui/ScoreRing";
+import { formatCoords, formatEta, formatSpeed, liveMapGeometry, rideStatusLabel } from "@/constants/liveMap";
 import { clock, rideDate } from "@/constants/format";
-import { LIVE_TRIP_ID, pastTrips } from "@/data/fleet";
+import { pastTrips } from "@/data/fleet";
 import { routeLine, shiftLine } from "@/data/route";
 import { useTheme } from "@/providers/ThemeProvider";
-import { rideMeta, tripHeadline, useRideStore, useSafetyIndex } from "@/stores/useRideStore";
+import { tripHeadline, useRideStore, useSafetyIndex } from "@/stores/useRideStore";
 
 export function TripDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const safety = useSafetyIndex();
+  const liveMode = useRideStore((state) => state.liveMode);
+  const rideId = useRideStore((state) => state.rideId);
+  const deviceId = useRideStore((state) => state.deviceId);
+  const passengerName = useRideStore((state) => state.passengerName);
+  const deviceState = useRideStore((state) => state.deviceState);
+  const safetyStatus = useRideStore((state) => state.safetyStatus);
+  const driverState = useRideStore((state) => state.driverState);
   const position = useRideStore((state) => state.position);
   const heading = useRideStore((state) => state.heading);
   const trail = useRideStore((state) => state.trail);
@@ -28,21 +37,34 @@ export function TripDetailScreen() {
   const guardians = useRideStore((state) => state.guardians);
   const routeShift = useRideStore((state) => state.routeShift);
   const acknowledge = useRideStore((state) => state.acknowledge);
-  const liveRoute = useMemo(() => shiftLine(routeLine, routeShift), [routeShift]);
+  const refreshing = useRideStore((state) => state.refreshing);
+  const refreshAll = useRideStore((state) => state.refreshAll);
+  const simulatedRoute = useMemo(
+    () => shiftLine(routeLine, liveMode ? null : routeShift),
+    [liveMode, routeShift],
+  );
+  const liveGeo = useMemo(() => liveMapGeometry(position, trail), [position, trail]);
   const { colors } = useTheme();
 
-  if (id !== LIVE_TRIP_ID && !pastTrips.some((trip) => trip.id === id)) {
+  const isLiveTrip = id === rideId;
+  const past = !liveMode ? pastTrips.find((trip) => trip.id === id) : undefined;
+
+  if (!isLiveTrip && !past) {
     return (
       <Page title="Missing ride" back>
-        <ScreenState kind="error" title="This trip is not on the phone" body="Open a ride from the Trips list." />
+        <ScreenState
+          kind="error"
+          title="This trip is not available"
+          body={liveMode ? "Only the active guardian API ride is loaded." : "Open a ride from the Trips list."}
+        />
       </Page>
     );
   }
 
-  const past = pastTrips.find((trip) => trip.id === id);
-  const live = !past;
-  const headline = tripHeadline(leg, Boolean(routeShift));
-  const route = past?.route ?? liveRoute;
+  const live = isLiveTrip;
+  const headline = tripHeadline(leg, Boolean(routeShift) && !liveMode);
+  const route = past?.route ?? (liveMode ? liveGeo.route : simulatedRoute);
+  const mapTrail = live ? (liveMode ? liveGeo.trail : trail) : route;
   const mapPosition = past?.position ?? position;
   const mapHeading = past?.heading ?? heading;
   const tripAlerts = alerts.filter((alert) => alert.tripId === id);
@@ -50,19 +72,27 @@ export function TripDetailScreen() {
 
   return (
     <Page
-      title={live ? headline.to : past.destinationLabel}
-      subtitle={live ? "In progress" : rideDate(past.startedAt)}
+      title={live ? (liveMode ? rideId : headline.to) : past!.destinationLabel}
+      subtitle={live ? `${passengerName || "Passenger"} · ${deviceId}` : rideDate(past!.startedAt)}
       back
-      action={<StatusPill status={live ? safety.status : past.safetyStatus} />}
+      refreshing={live && liveMode ? refreshing : false}
+      onRefresh={live && liveMode ? () => void refreshAll() : undefined}
+      action={<StatusPill status={live ? safety.status : past!.safetyStatus} />}
     >
+      {live ? (
+        <View style={{ marginBottom: 10 }}>
+          <ApiStatusBanner onRetry={() => void refreshAll()} />
+        </View>
+      ) : null}
+
       <View style={[styles.map, { borderColor: colors.line, backgroundColor: colors.mapBg }]}>
         <RideMap
           route={route}
-          trail={live ? trail : route}
+          trail={mapTrail}
           position={mapPosition}
           heading={mapHeading}
-          destination={route[route.length - 1]}
-          origin={route[0]}
+          destination={live && liveMode ? null : route[route.length - 1]}
+          origin={live && liveMode ? null : route[0]}
           follow={false}
           deviceFix={null}
           onPan={() => undefined}
@@ -71,30 +101,43 @@ export function TripDetailScreen() {
       </View>
       <View style={styles.block}>
         <AppText variant="title" style={{ fontSize: 22 }}>
-          {live ? rideMeta.passenger.name : rideMeta.passenger.name}
+          {passengerName || "Passenger"}
+        </AppText>
+        <AppText variant="caption">
+          {live && liveMode
+            ? `${rideStatusLabel({ safetyStatus, deviceState, speedKmh: speed })} · ${driverState}`
+            : `${deviceId} · ${deviceState || "device"}`}
         </AppText>
         <View style={styles.metrics}>
-          <Metric label="Speed" value={live ? `${speed} km/h` : `${past.distanceKm.toFixed(1)} km`} />
-          <Metric label={live ? "ETA" : "From"} value={live ? `${eta} min` : past.originLabel} />
+          <Metric
+            label={live ? "Speed" : "Distance"}
+            value={live ? formatSpeed(speed) : `${past!.distanceKm.toFixed(1)} km`}
+          />
+          <Metric
+            label={live ? "ETA" : "From"}
+            value={live ? formatEta(eta) : past!.originLabel}
+          />
           <Metric label="Shared" value={String(sharing.length)} />
         </View>
-        <AppText variant="caption" numberOfLines={1}>
-          {live ? shareLink : "Share closed"}
+        <AppText variant="caption" numberOfLines={2}>
+          {live
+            ? `${deviceId} · ${formatCoords(position)}${shareLink ? ` · ${shareLink}` : ""}`
+            : "Share closed"}
         </AppText>
       </View>
       <AppText variant="strong" style={styles.section}>
         Events
       </AppText>
       {tripAlerts.length === 0 ? (
-        <ScreenState kind="empty" title="No events" body="Nothing has been recorded on this ride." />
+        <ScreenState kind="empty" title="No events" body="Nothing has been recorded on this ride yet." />
       ) : (
         tripAlerts.map((alert, index) => (
           <AlertTimelineItem
             key={alert.id}
             alert={alert}
-            timeLabel={`${clock(alert.at)} · ${alert.locationLabel}`}
+            timeLabel={`${clock(alert.at)} · ${alert.locationLabel || "Location unknown"}`}
             showLine={index < tripAlerts.length - 1}
-            onAcknowledge={() => acknowledge(alert.id)}
+            onAcknowledge={() => void acknowledge(alert.id)}
           />
         ))
       )}

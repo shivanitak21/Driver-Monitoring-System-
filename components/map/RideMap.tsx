@@ -76,14 +76,24 @@ function NativeRideMap({
       moveOnMarkerPress={false}
       onPanDrag={onPan}
     >
-      <Polyline coordinates={route} strokeColor={scheme === "light" ? "rgba(23,25,29,0.28)" : "rgba(245,246,247,0.38)"} strokeWidth={3} />
+      {route.length > 1 ? (
+        <Polyline
+          coordinates={route}
+          strokeColor={scheme === "light" ? "rgba(23,25,29,0.28)" : "rgba(245,246,247,0.38)"}
+          strokeWidth={3}
+        />
+      ) : null}
       {trail.length > 1 ? <Polyline coordinates={trail} strokeColor={colors.signal} strokeWidth={4} /> : null}
-      <Marker coordinate={origin} anchor={{ x: 0.5, y: 0.5 }}>
-        <View style={[styles.origin, { backgroundColor: colors.inkFaint, borderColor: colors.bg }]} />
-      </Marker>
-      <Marker coordinate={destination} anchor={{ x: 0.5, y: 0.5 }}>
-        <View style={[styles.destination, { backgroundColor: colors.cyan, borderColor: colors.bg }]} />
-      </Marker>
+      {origin ? (
+        <Marker coordinate={origin} anchor={{ x: 0.5, y: 0.5 }}>
+          <View style={[styles.origin, { backgroundColor: colors.inkFaint, borderColor: colors.bg }]} />
+        </Marker>
+      ) : null}
+      {destination ? (
+        <Marker coordinate={destination} anchor={{ x: 0.5, y: 0.5 }}>
+          <View style={[styles.destination, { backgroundColor: colors.cyan, borderColor: colors.bg }]} />
+        </Marker>
+      ) : null}
       {deviceFix ? (
         <Marker coordinate={deviceFix} anchor={{ x: 0.5, y: 0.5 }}>
           <View style={[styles.device, { borderColor: colors.bgRaised }]} />

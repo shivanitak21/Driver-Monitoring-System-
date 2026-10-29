@@ -9,6 +9,7 @@ import { useDockOffset } from "@/components/layout/DockTabBar";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
 import { RideMap } from "@/components/map/RideMap";
 import { SosButton } from "@/components/safety/SosButton";
+import { ApiStatusBanner } from "@/components/system/ApiStatusBanner";
 import { OfflineBanner } from "@/components/system/OfflineBanner";
 import { IconButton } from "@/components/ui/Button";
 import { Glass } from "@/components/ui/Glass";
@@ -17,17 +18,34 @@ import { ScoreRing } from "@/components/ui/ScoreRing";
 import { ScreenState } from "@/components/ui/ScreenState";
 import { useReduceMotion } from "@/hooks/useReduceMotion";
 import { timeAgo } from "@/constants/format";
-import { VEHICLE_ID } from "@/data/fleet";
+import {
+  driverStateLabel,
+  formatCoords,
+  formatEta,
+  formatSpeed,
+  liveMapGeometry,
+  rideStatusLabel,
+} from "@/constants/liveMap";
 import { routeLine, shiftLine } from "@/data/route";
+import { useLiveApiRefresh } from "@/hooks/useLiveApiRefresh";
 import { useTheme } from "@/providers/ThemeProvider";
 import { rideMeta, tripHeadline, useRideStore, useSafetyIndex } from "@/stores/useRideStore";
 
 export function LiveMapScreen() {
+  useLiveApiRefresh("all");
   const insets = useSafeAreaInsets();
   const dock = useDockOffset();
   const { colors } = useTheme();
   const reduceMotion = useReduceMotion();
   const booting = useRideStore((state) => state.booting);
+  const liveMode = useRideStore((state) => state.liveMode);
+  const connection = useRideStore((state) => state.connection);
+  const connectionError = useRideStore((state) => state.connectionError);
+  const passengerName = useRideStore((state) => state.passengerName);
+  const deviceId = useRideStore((state) => state.deviceId);
+  const rideId = useRideStore((state) => state.rideId);
+  const deviceState = useRideStore((state) => state.deviceState);
+  const driverState = useRideStore((state) => state.driverState);
   const position = useRideStore((state) => state.position);
   const heading = useRideStore((state) => state.heading);
   const trail = useRideStore((state) => state.trail);
@@ -40,17 +58,36 @@ export function LiveMapScreen() {
   const routeShift = useRideStore((state) => state.routeShift);
   const alerts = useRideStore((state) => state.alerts);
   const startCall = useRideStore((state) => state.startCall);
+  const refreshAll = useRideStore((state) => state.refreshAll);
+  const bootstrapLive = useRideStore((state) => state.bootstrapLive);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const safety = useSafetyIndex();
   const askSos = useRideStore((state) => state.askSos);
-  const headline = tripHeadline(leg, Boolean(routeShift));
-  const route = useMemo(() => shiftLine(routeLine, routeShift), [routeShift]);
-  const origin = route[0];
-  const destination = route[route.length - 1];
+  const safetyStatus = useRideStore((state) => state.safetyStatus);
+  const deviceOnline = (deviceState || "").toLowerCase() === "online";
+  const statusLabel = liveMode
+    ? rideStatusLabel({ safetyStatus, deviceState, speedKmh: speed })
+    : tripHeadline(leg, Boolean(routeShift)).status;
+  const headline = liveMode
+    ? {
+        status: statusLabel,
+        to: deviceId || rideId,
+        from: passengerName || "Passenger",
+      }
+    : tripHeadline(leg, Boolean(routeShift));
+  const simulatedRoute = useMemo(() => shiftLine(routeLine, routeShift), [routeShift]);
+  const liveGeo = useMemo(() => liveMapGeometry(position, trail), [position, trail]);
+  const route = liveMode ? liveGeo.route : simulatedRoute;
+  const mapTrail = liveMode ? liveGeo.trail : trail;
+  const origin = liveMode ? null : simulatedRoute[0];
+  const destination = liveMode ? null : simulatedRoute[simulatedRoute.length - 1];
   const openAlerts = alerts.filter((alert) => !alert.acknowledged);
+  const retry = () => {
+    void (connection === "error" ? bootstrapLive() : refreshAll());
+  };
   const urgent = openAlerts.some((alert) => alert.severity === "high" || alert.severity === "critical");
   const alertPreview = openAlerts.slice(0, 3);
-  const openVehicle = () => router.push(`/vehicle/${VEHICLE_ID}`);
+  const openVehicle = () => router.push(`/vehicle/${deviceId || rideMeta.deviceId}`);
 
   const styles = useMemo(
     () =>
@@ -75,7 +112,7 @@ export function LiveMapScreen() {
           width: 8,
           height: 8,
           borderRadius: 4,
-          backgroundColor: colors.signal,
+          backgroundColor: liveMode && !deviceOnline ? colors.amber : colors.signal,
         },
         tools: {
           alignItems: "flex-end",
@@ -133,7 +170,7 @@ export function LiveMapScreen() {
           paddingHorizontal: 24,
         },
       }),
-    [colors, dock, urgent],
+    [colors, dock, liveMode, deviceOnline, urgent],
   );
 
   return (
@@ -142,7 +179,7 @@ export function LiveMapScreen() {
         <MapErrorBoundary>
           <RideMap
             route={route}
-            trail={trail}
+            trail={mapTrail}
             position={position}
             heading={heading}
             destination={destination}
@@ -162,10 +199,16 @@ export function LiveMapScreen() {
               </View>
               <View style={{ paddingRight: 14, paddingVertical: 8, gap: 1 }}>
                 <AppText variant="strong" style={{ fontSize: 14 }}>
-                  Live
+                  {liveMode
+                    ? connection !== "live"
+                      ? "Syncing"
+                      : deviceOnline
+                        ? "Live"
+                        : "Offline device"
+                    : "Live"}
                 </AppText>
                 <AppText variant="caption" numberOfLines={1}>
-                  {rideMeta.passenger.name}
+                  {passengerName || rideId}
                 </AppText>
               </View>
             </View>
@@ -193,7 +236,9 @@ export function LiveMapScreen() {
               <Glass radius={18} padded>
                 <View style={styles.alertPanel}>
                   {alertPreview.length === 0 ? (
-                    <AppText variant="caption">No open alerts</AppText>
+                    <AppText variant="caption">
+                      {liveMode ? "No alerts from the API" : "No open alerts"}
+                    </AppText>
                   ) : (
                     alertPreview.map((alert) => (
                       <Pressable
@@ -216,7 +261,10 @@ export function LiveMapScreen() {
         </View>
 
         <View style={styles.bannerSlot} pointerEvents="box-none">
-          <OfflineBanner />
+          <View style={{ gap: 8 }}>
+            <OfflineBanner />
+            <ApiStatusBanner onRetry={retry} />
+          </View>
         </View>
       </View>
 
@@ -238,25 +286,48 @@ export function LiveMapScreen() {
             <View style={styles.sheetTop}>
               <View style={styles.flex}>
                 <AppText variant="title" numberOfLines={1} style={{ fontSize: 22 }}>
-                  {rideMeta.passenger.name}
+                  {passengerName}
                 </AppText>
                 <AppText variant="caption" numberOfLines={1}>
-                  {headline.status} · {headline.to}
+                  {liveMode
+                    ? `${headline.status} · ${driverStateLabel(driverState)}`
+                    : `${headline.status} · ${headline.to}`}
                 </AppText>
               </View>
               <ScoreRing index={safety.index} status={safety.status} size={52} caption="Safety score" />
             </View>
             <View style={styles.metrics}>
-              <Metric label="ETA" value={`${eta} min`} />
-              <Metric label="Speed" value={`${speed} km/h`} />
+              <Metric label="ETA" value={formatEta(eta)} />
+              <Metric label="Speed" value={formatSpeed(speed)} />
             </View>
+            {liveMode ? (
+              <AppText variant="caption" numberOfLines={2} style={{ marginTop: 8 }}>
+                {`${deviceId} · ${deviceState || "device"} · ${formatCoords(position)}`}
+              </AppText>
+            ) : null}
           </View>
         </Glass>
       </Animated.View>
 
       {booting ? (
         <View style={styles.boot} testID="boot-overlay">
-          <ScreenState kind="loading" title="Finding the ride" body="BMW M5" />
+          <ScreenState
+            kind="loading"
+            title={liveMode ? "Connecting to guardian API" : "Finding the ride"}
+            body={liveMode ? `${rideId} · ${deviceId}` : "BMW M5"}
+          />
+        </View>
+      ) : null}
+
+      {!booting && liveMode && connection === "error" ? (
+        <View style={styles.boot} testID="api-error-overlay">
+          <ScreenState
+            kind="error"
+            title="Could not load the ride"
+            body={connectionError ?? "Could not reach http://51.81.81.118:8000. Retry when the API is up."}
+            actionLabel="Retry"
+            onAction={retry}
+          />
         </View>
       ) : null}
     </View>

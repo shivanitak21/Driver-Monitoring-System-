@@ -7,8 +7,8 @@ import { useCallback, useMemo, type RefObject } from "react";
 
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
+import { formatMetric } from "@/constants/liveMap";
 import { vehiclePhotos } from "@/data/photos";
-import { vehicleProfile } from "@/data/fleet";
 import { useTheme } from "@/providers/ThemeProvider";
 import { useRideStore, useSafetyIndex } from "@/stores/useRideStore";
 
@@ -21,6 +21,10 @@ export function VehicleSheet({ sheetRef }: Props) {
   const { width } = useWindowDimensions();
   const safety = useSafetyIndex();
   const speed = useRideStore((state) => state.speedKmh);
+  const deviceId = useRideStore((state) => state.deviceId);
+  const rideId = useRideStore((state) => state.rideId);
+  const passengerName = useRideStore((state) => state.passengerName);
+  const deviceState = useRideStore((state) => state.deviceState);
   const { colors } = useTheme();
   const renderBackdrop = useCallback(
     (props: BottomSheetBackdropProps) => (
@@ -41,10 +45,11 @@ export function VehicleSheet({ sheetRef }: Props) {
     >
       <BottomSheetScrollView contentContainerStyle={styles.content}>
         <AppText variant="title" style={styles.name}>
-          {vehicleProfile.name}
+          {deviceId || "Vehicle"}
         </AppText>
         <AppText variant="body">
-          {vehicleProfile.trim} · {vehicleProfile.color} · {vehicleProfile.plate}
+          {rideId}
+          {passengerName ? ` · ${passengerName}` : ""} · {deviceState || "device"}
         </AppText>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.gallery}>
           {vehiclePhotos.map((photo) => (
@@ -52,7 +57,7 @@ export function VehicleSheet({ sheetRef }: Props) {
               key={photo.id}
               onPress={() => {
                 sheetRef.current?.dismiss();
-                router.push(`/vehicle/${vehicleProfile.id}`);
+                router.push(`/vehicle/${deviceId}`);
               }}
               style={{ width: width * 0.72 }}
             >
@@ -64,15 +69,15 @@ export function VehicleSheet({ sheetRef }: Props) {
           ))}
         </ScrollView>
         <View style={styles.stats}>
-          <Stat label="Speed" value={`${speed}`} unit="km/h" />
-          <Stat label="Cabin risk" value={`${safety.risk.score}`} unit={safety.risk.severity} />
-          <Stat label="Index" value={`${safety.index}`} unit={safety.status} />
+          <Stat label="Speed" value={formatMetric(speed, "")} unit="km/h" />
+          <Stat label="Safety" value={`${safety.index}`} unit={safety.status} />
+          <Stat label="Device" value={deviceState || "—"} unit={deviceId} />
         </View>
         <Button
           label="Vehicle details"
           onPress={() => {
             sheetRef.current?.dismiss();
-            router.push(`/vehicle/${vehicleProfile.id}`);
+            router.push(`/vehicle/${deviceId}`);
           }}
         />
       </BottomSheetScrollView>
@@ -85,8 +90,12 @@ function Stat({ label, value, unit }: { label: string; value: string; unit: stri
   return (
     <View style={[styles.stat, { backgroundColor: colors.bg, borderColor: colors.line }]}>
       <AppText variant="label">{label}</AppText>
-      <AppText variant="metric">{value}</AppText>
-      <AppText variant="caption">{unit}</AppText>
+      <AppText variant="metric" numberOfLines={1}>
+        {value}
+      </AppText>
+      <AppText variant="caption" numberOfLines={1}>
+        {unit}
+      </AppText>
     </View>
   );
 }

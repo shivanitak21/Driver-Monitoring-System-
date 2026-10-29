@@ -5,12 +5,15 @@ import { useLocalSearchParams } from "expo-router";
 
 import { Page } from "@/components/layout/Page";
 import { SeatOccupancyGrid } from "@/components/safety/SeatOccupancyGrid";
+import { ApiStatusBanner } from "@/components/system/ApiStatusBanner";
+import { StatusChip } from "@/components/system/StatusChip";
 import { AppText } from "@/components/ui/AppText";
 import { ScreenState } from "@/components/ui/ScreenState";
 import { Segmented } from "@/components/ui/Segmented";
 import { PhotoOrbit } from "@/components/vehicle/PhotoOrbit";
+import { formatCoords, formatSpeed } from "@/constants/liveMap";
 import { vehiclePhotos } from "@/data/photos";
-import { VEHICLE_ID, initialSeats, vehicleProfile } from "@/data/fleet";
+import { DEVICE_ID, VEHICLE_ID } from "@/data/fleet";
 import { useTheme } from "@/providers/ThemeProvider";
 import { useRideStore, useSafetyIndex } from "@/stores/useRideStore";
 
@@ -22,24 +25,55 @@ export function VehicleScreen() {
   const safety = useSafetyIndex();
   const speed = useRideStore((state) => state.speedKmh);
   const heading = useRideStore((state) => state.heading);
+  const seats = useRideStore((state) => state.seats);
+  const deviceState = useRideStore((state) => state.deviceState);
+  const deviceId = useRideStore((state) => state.deviceId);
+  const rideId = useRideStore((state) => state.rideId);
+  const passengerName = useRideStore((state) => state.passengerName);
+  const position = useRideStore((state) => state.position);
+  const safetyStatus = useRideStore((state) => state.safetyStatus);
+  const driverState = useRideStore((state) => state.driverState);
+  const liveMode = useRideStore((state) => state.liveMode);
+  const refreshAll = useRideStore((state) => state.refreshAll);
+  const refreshing = useRideStore((state) => state.refreshing);
   const { colors } = useTheme();
   const [tab, setTab] = useState("exterior");
   const [interior, setInterior] = useState(0);
+  const deviceOnline = (deviceState || "").toLowerCase() === "online";
 
-  if (id !== VEHICLE_ID) {
+  const enrolledIds = new Set([deviceId, DEVICE_ID, VEHICLE_ID, "bmw-m5"].filter(Boolean));
+  if (!enrolledIds.has(id)) {
     return (
       <Page title="Unknown vehicle" back>
-        <ScreenState kind="error" title="This vehicle is not enrolled" body="Only the BMW M5 on this ride is enrolled." />
+        <ScreenState
+          kind="error"
+          title="This vehicle is not enrolled"
+          body={`Only device ${deviceId || DEVICE_ID} on ride ${rideId} is enrolled.`}
+        />
       </Page>
     );
   }
 
   return (
     <Page
-      title={vehicleProfile.name}
-      subtitle={`${vehicleProfile.trim} · ${vehicleProfile.color} · ${vehicleProfile.plate}`}
+      title={deviceId || DEVICE_ID}
+      subtitle={`${rideId}${passengerName ? ` · ${passengerName}` : ""}${liveMode ? ` · ${deviceState || "device"}` : ""}`}
       back
+      refreshing={liveMode ? refreshing : false}
+      onRefresh={liveMode ? () => void refreshAll() : undefined}
     >
+      {liveMode ? (
+        <View style={{ marginBottom: 10, gap: 10 }}>
+          <ApiStatusBanner onRetry={() => void refreshAll()} />
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            <StatusChip label={safetyStatus} tone={safetyStatus === "safe" ? "ok" : safetyStatus === "caution" ? "warn" : "danger"} />
+            <StatusChip label={deviceState || "device"} tone={deviceOnline ? "ok" : "warn"} />
+            <StatusChip label={driverState} tone={driverState === "attentive" ? "ok" : "danger"} />
+          </View>
+          <AppText variant="caption">{formatCoords(position)}</AppText>
+        </View>
+      ) : null}
+
       <View style={styles.tabs}>
         <Segmented
           value={tab}
@@ -84,12 +118,17 @@ export function VehicleScreen() {
       ) : null}
 
       <View style={styles.stats}>
-        <Stat label="Speed" value={`${speed} km/h`} />
+        <Stat label="Speed" value={formatSpeed(speed)} />
         <Stat label="Heading" value={`${Math.round(heading)}°`} />
         <Stat label="Safety score" value={`${safety.index}`} />
       </View>
       <View style={styles.seats}>
-        <SeatOccupancyGrid seats={initialSeats} />
+        <SeatOccupancyGrid seats={seats} awaitingWhenEmpty={liveMode} />
+        {liveMode && seats.length === 0 ? (
+          <AppText variant="caption" style={{ marginTop: 8 }}>
+            Seat occupancy has not been reported by the cabin API yet.
+          </AppText>
+        ) : null}
       </View>
     </Page>
   );

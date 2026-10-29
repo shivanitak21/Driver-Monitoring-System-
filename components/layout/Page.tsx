@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { ChevronLeft } from "@/components/ui/icons";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,9 +14,19 @@ type Props = {
   children: ReactNode;
   back?: boolean;
   action?: ReactNode;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 };
 
-export function Page({ title, subtitle, children, back = false, action }: Props) {
+export function Page({
+  title,
+  subtitle,
+  children,
+  back = false,
+  action,
+  refreshing = false,
+  onRefresh,
+}: Props) {
   const insets = useSafeAreaInsets();
   const dock = useDockOffset();
   const { colors } = useTheme();
@@ -83,6 +93,11 @@ export function Page({ title, subtitle, children, back = false, action }: Props)
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ paddingBottom: back ? insets.bottom + 28 : dock + 16, paddingHorizontal: 20 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.signal} />
+          ) : undefined
+        }
       >
         {children}
       </ScrollView>

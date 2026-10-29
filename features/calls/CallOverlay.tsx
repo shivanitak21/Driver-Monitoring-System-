@@ -1,21 +1,21 @@
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
-import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { Glass } from "@/components/ui/Glass";
 import { useTheme } from "@/providers/ThemeProvider";
-import { driverProfile } from "@/data/fleet";
-import { vehiclePhotos } from "@/data/photos";
 import { useRideStore } from "@/stores/useRideStore";
 
 export function CallOverlay() {
   const call = useRideStore((state) => state.call);
   const patchCall = useRideStore((state) => state.patchCall);
   const endCall = useRideStore((state) => state.endCall);
+  const passengerName = useRideStore((state) => state.passengerName);
+  const deviceId = useRideStore((state) => state.deviceId);
+  const rideId = useRideStore((state) => state.rideId);
   const [cameraPermission, requestCamera] = useCameraPermissions();
   const [micPermission, requestMic] = useMicrophonePermissions();
   const insets = useSafeAreaInsets();
@@ -64,17 +64,17 @@ export function CallOverlay() {
     <View style={[styles.overlay, { paddingTop: insets.top + 12, backgroundColor: colors.bg }]} testID="call-overlay">
       <View style={styles.remote}>
         {call.mode === "video" ? (
-          <Image source={vehiclePhotos[1].source} style={StyleSheet.absoluteFill} contentFit="cover" />
+          <View style={[StyleSheet.absoluteFill, styles.audioField, { backgroundColor: colors.bgSoft }]} />
         ) : (
           <View style={styles.audioField} />
         )}
         <View style={styles.scrim} />
         <AppText variant="label" style={{ color: colors.signal }}>
-          {call.mode === "audio" ? "Audio" : "Video"} · {driverProfile.name}
+          {call.mode === "audio" ? "Audio" : "Video"} · {passengerName || rideId}
         </AppText>
         <AppText variant="display">{call.phase === "live" ? clock : call.phase}</AppText>
         <AppText variant="body" style={styles.note}>
-          {call.hardware ? "Using this phone on the call." : "This phone stays off the call until you allow it."}
+          {deviceId} · {call.hardware ? "Using this phone on the call." : "Allow mic/camera to continue."}
         </AppText>
         {call.mode === "video" && call.hardware && call.phase === "live" ? (
           <View style={[styles.local, { borderColor: colors.line }]}>

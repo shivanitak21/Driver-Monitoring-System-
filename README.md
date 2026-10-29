@@ -25,7 +25,15 @@ Restart Expo after changing it, and enable **Maps JavaScript API** on the key.
 
 Without a key, Android and iOS use the map bundled with Expo Go. The browser draws the route without Google tiles. A store build reads the same key through the `react-native-maps` plugin in `app.config.ts`.
 
-Leave `EXPO_PUBLIC_TELEMETRY_URL` and `EXPO_PUBLIC_MQTT_URL` empty. This build does not open those connections.
+The app defaults to the demo guardian API:
+
+```bash
+EXPO_PUBLIC_TELEMETRY_URL=http://51.81.81.118:8000
+EXPO_PUBLIC_RIDE_ID=ride-1842
+EXPO_PUBLIC_DEVICE_ID=orin-nano-01
+```
+
+Swagger: `http://51.81.81.118:8000/docs`. Leave `EXPO_PUBLIC_MQTT_URL` empty — the phone talks only HTTP/WebSocket. Clear `EXPO_PUBLIC_TELEMETRY_URL` only if you intentionally want the on-phone simulation.
 
 ## Stored on the phone
 

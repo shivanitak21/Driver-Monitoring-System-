@@ -2,7 +2,10 @@ import { pointOnRoute, routeLine } from "@/data/route";
 import type { Guardian, PastTrip, Seat } from "@/types/domain";
 
 export const LIVE_TRIP_ID = "ride-1842";
-export const VEHICLE_ID = "bmw-m5";
+/** Edge device id from the guardian API demo ride. */
+export const DEVICE_ID = "orin-nano-01";
+/** Route param used by the Vehicle screen; prefers the live device id. */
+export const VEHICLE_ID = DEVICE_ID;
 
 export const passenger = {
   name: "Meera Shah",
@@ -18,12 +21,13 @@ export const driverProfile = {
 
 export const vehicleProfile = {
   id: VEHICLE_ID,
-  name: "BMW M5",
-  trim: "Competition",
-  color: "Alpine White",
-  plate: "KA 03 MH 5301",
-  cabinId: "CAB-18",
+  name: "Guardian vehicle",
+  trim: DEVICE_ID,
+  color: "Fleet",
+  plate: LIVE_TRIP_ID,
+  cabinId: DEVICE_ID,
   vinTail: "1842",
+  deviceId: DEVICE_ID,
 };
 
 export const initialSeats: Seat[] = [

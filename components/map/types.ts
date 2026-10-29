@@ -5,8 +5,8 @@ export type RideMapProps = {
   trail: Coordinate[];
   position: Coordinate;
   heading: number;
-  destination: Coordinate;
-  origin: Coordinate;
+  destination?: Coordinate | null;
+  origin?: Coordinate | null;
   follow: boolean;
   deviceFix: Coordinate | null;
   onPan: () => void;

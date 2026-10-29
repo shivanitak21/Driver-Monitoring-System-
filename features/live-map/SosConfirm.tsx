@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import * as Haptics from "expo-haptics";
 
@@ -11,16 +12,23 @@ export function SosConfirm() {
   const cancel = useRideStore((state) => state.cancelSos);
   const confirm = useRideStore((state) => state.confirmSos);
   const { colors } = useTheme();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   if (!open) return null;
 
   return (
     <View style={[styles.backdrop, { backgroundColor: colors.scrim }]} testID="sos-confirm">
-      <Pressable style={StyleSheet.absoluteFill} onPress={cancel} />
+      <Pressable style={StyleSheet.absoluteFill} onPress={busy ? undefined : cancel} />
       <View style={[styles.card, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}>
         <AppText variant="title">Raise SOS for this ride</AppText>
         <AppText variant="body">
           People with sharing on are notified, and this ride is marked Emergency.
         </AppText>
+        {error ? (
+          <AppText variant="caption" style={{ color: colors.dangerSoft }}>
+            {error}
+          </AppText>
+        ) : null}
         <View style={styles.row}>
           <View style={styles.flex}>
             <Button label="Cancel" tone="ghost" onPress={cancel} />
@@ -28,11 +36,15 @@ export function SosConfirm() {
           <View style={styles.flex}>
             <Button
               testID="sos-confirm-button"
-              label="Raise SOS"
+              label={busy ? "Sending…" : "Raise SOS"}
               tone="danger"
               onPress={() => {
+                setBusy(true);
+                setError(null);
                 void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                void confirm();
+                void confirm()
+                  .catch((err: Error) => setError(err.message || "SOS failed"))
+                  .finally(() => setBusy(false));
               }}
             />
           </View>
