@@ -30,12 +30,9 @@ export function CabinScreen() {
   const setFault = useRideStore((state) => state.setFeedFault);
   const driverState = useRideStore((state) => state.driverState);
   const seats = useRideStore((state) => state.seats);
-  const safetyStatus = useRideStore((state) => state.safetyStatus);
   const passengerName = useRideStore((state) => state.passengerName);
   const deviceId = useRideStore((state) => state.deviceId);
-  const deviceState = useRideStore((state) => state.deviceState);
   const publisherOnline = useRideStore((state) => state.publisherOnline);
-  const score = useRideStore((state) => state.score);
   const rideId = useRideStore((state) => state.rideId);
   const analysis = useRideStore((state) => state.analysis);
   const frameDms = useRideStore((state) => state.frameDms);
@@ -91,7 +88,6 @@ export function CabinScreen() {
   }, [consent, liveMode, phase, refreshAnalysis, refreshFrames]);
 
   const attentive = driverState === "attentive";
-  const deviceOnline = (deviceState || "").toLowerCase() === "online";
   const snapChannel: MediaChannel = camera === "cms" ? "cms" : "dms";
   const styles = useMemo(
     () =>
@@ -147,14 +143,8 @@ export function CabinScreen() {
       {consent && phase === "live" ? (
         <View style={styles.stack}>
           <View style={styles.chips}>
-            <StatusChip
-              label={safetyStatus}
-              tone={safetyStatus === "emergency" ? "danger" : safetyStatus === "caution" ? "warn" : "ok"}
-            />
             <StatusChip label={driverStateLabel(driverState)} tone={attentive ? "ok" : "danger"} />
-            <StatusChip label={deviceOnline ? "online" : "offline"} tone={deviceOnline ? "ok" : "warn"} />
             <StatusChip label={publisherOnline ? "cam on" : "cam off"} tone={publisherOnline ? "ok" : "warn"} />
-            <StatusChip label={`${score}`} tone={score >= 80 ? "ok" : score >= 50 ? "warn" : "danger"} />
           </View>
 
           {liveMode ? (

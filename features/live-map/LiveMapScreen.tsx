@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Bell, Car, LocateFixed, Settings, Video, X } from "@/components/ui/icons";
+import { Bell, Car, LocateFixed, Settings, X } from "@/components/ui/icons";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -332,7 +332,6 @@ export function LiveMapScreen() {
       >
         <View style={styles.actions}>
           <MapAction testID="home-vehicle" label="Vehicle" onPress={openVehicle} icon={<Car size={18} color={colors.ink} strokeWidth={1.75} />} />
-          <MapAction testID="home-cabin" label="Cabin" onPress={() => router.push("/cabin")} icon={<Video size={18} color={colors.ink} strokeWidth={1.75} />} />
           <View style={styles.action}>
             <SosButton onPress={askSos} />
           </View>
@@ -362,7 +361,6 @@ export function LiveMapScreen() {
               <AppText variant="caption" numberOfLines={1} style={{ marginTop: 8 }}>
                 {deviceOnline ? "Online" : "Offline"}
                 {publisherOnline ? " · cam on" : " · cam off"}
-                {openAlerts.length ? ` · ${openAlerts.length} open` : ""}
               </AppText>
             ) : null}
           </View>
