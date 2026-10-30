@@ -875,12 +875,9 @@ export const useRideStore = create<RideState>()(
       stopWatch: async () => {
         if (!services.api) return;
         try {
-          const result = await services.api.cancelVideo(get().rideId);
-          const current = get().videoSession;
+          await services.api.cancelVideo(get().rideId);
           set({
-            videoSession: current
-              ? { ...current, publish: result.publish, publisherOnline: false }
-              : null,
+            videoSession: null,
             lastSyncedAt: Date.now(),
             connectionError: null,
           });

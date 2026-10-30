@@ -2,8 +2,9 @@ import { useMemo, useState, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import * as Haptics from "expo-haptics";
 
+import { CabinWatchPlayer } from "@/components/media/CabinWatchPlayer";
 import { AppText } from "@/components/ui/AppText";
-import { Camera, CircleDot, Ear, Mic } from "@/components/ui/icons";
+import { Camera, Ear, Mic, Video } from "@/components/ui/icons";
 import { bustMediaUrl } from "@/services/api/media";
 import { saveRemoteImageToGallery } from "@/services/media/gallery";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -23,9 +24,8 @@ export function CabinMediaBar({ channel }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
-  const [recording, setRecording] = useState(false);
 
-  const watching = Boolean(videoSession?.publish);
+  const watching = Boolean(videoSession);
 
   const styles = useMemo(
     () =>
@@ -57,7 +57,6 @@ export function CabinMediaBar({ channel }: Props) {
     setNote(null);
     try {
       await work();
-      void Haptics.selectionAsync();
     } catch (error) {
       setNote(error instanceof Error ? error.message : "Action failed");
     } finally {
@@ -65,25 +64,28 @@ export function CabinMediaBar({ channel }: Props) {
     }
   };
 
-  const onRecord = () =>
-    run("record", async () => {
-      if (recording || watching) {
+  const onWatch = () =>
+    run("watch", async () => {
+      if (watching) {
         await stopWatch();
-        setRecording(false);
         setListening(false);
         setNote("Watch stopped.");
         return;
       }
       await startWatch();
-      setRecording(true);
-      setNote("Watch started on the car. Full MP4 record-to-gallery needs native LiveKit + cloud recording API.");
+      setNote("Watching cabin LiveKit (video + mic tracks named cabin).");
     });
 
   const onListen = () =>
     run("listen", async () => {
+      if (listening) {
+        setListening(false);
+        setNote("Cabin mic muted.");
+        return;
+      }
       if (!watching) await startWatch();
       setListening(true);
-      setNote("Listen needs the cabin LiveKit audio track in a native build (Expo Go cannot play LiveKit audio).");
+      setNote("Listening to cabin microphone.");
     });
 
   const onSnap = () =>
@@ -105,16 +107,16 @@ export function CabinMediaBar({ channel }: Props) {
     <View style={styles.wrap}>
       <View style={styles.row}>
         <MediaButton
-          label={recording || watching ? "Stop" : "Record"}
-          busy={busy === "record"}
-          active={recording || watching}
+          label={watching ? "Stop" : "Watch"}
+          busy={busy === "watch"}
+          active={watching}
           styles={styles}
           colors={colors}
-          onPress={onRecord}
-          icon={<CircleDot size={18} color={colors.ink} strokeWidth={1.75} />}
+          onPress={onWatch}
+          icon={<Video size={18} color={colors.ink} strokeWidth={1.75} />}
         />
         <MediaButton
-          label={listening ? "Listen…" : "Listen"}
+          label={listening ? "Mute" : "Listen"}
           busy={busy === "listen"}
           active={listening}
           styles={styles}
@@ -141,6 +143,9 @@ export function CabinMediaBar({ channel }: Props) {
           icon={<Mic size={18} color={colors.ink} strokeWidth={1.75} />}
         />
       </View>
+
+      {watching && videoSession ? <CabinWatchPlayer session={videoSession} listen={listening} /> : null}
+
       {note ? <AppText variant="caption">{note}</AppText> : null}
     </View>
   );

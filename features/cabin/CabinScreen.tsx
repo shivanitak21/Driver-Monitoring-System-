@@ -149,7 +149,13 @@ export function CabinScreen() {
 
           {liveMode ? (
             <>
-              <CabinMediaBar channel={snapChannel} />
+              <View style={styles.section}>
+                <AppText variant="strong">Live Watch</AppText>
+                <AppText variant="caption">
+                  Cabin stream: stitched driver + passenger video and cabin mic (LiveKit tracks named cabin).
+                </AppText>
+                <CabinMediaBar channel={snapChannel} />
+              </View>
 
               <Segmented
                 value={camera}
@@ -163,13 +169,13 @@ export function CabinScreen() {
 
               {camera === "both" ? (
                 <View style={styles.dual}>
-                  <LiveStill frame={frameDms} label="Driver" height={200} />
-                  <LiveStill frame={frameCms} label="Cabin" height={200} />
+                  <LiveStill frame={frameDms} label="Driver still" height={200} />
+                  <LiveStill frame={frameCms} label="Cabin still" height={200} />
                 </View>
               ) : (
                 <LiveStill
                   frame={camera === "cms" ? frameCms : frameDms}
-                  label={camera === "cms" ? "Cabin" : "Driver"}
+                  label={camera === "cms" ? "Cabin still" : "Driver still"}
                   height={260}
                 />
               )}
