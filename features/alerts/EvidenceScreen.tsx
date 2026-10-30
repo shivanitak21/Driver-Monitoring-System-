@@ -8,11 +8,24 @@ import { Page } from "@/components/layout/Page";
 import { AppText } from "@/components/ui/AppText";
 import { ScreenState } from "@/components/ui/ScreenState";
 import { clock } from "@/constants/format";
+import { ApiError } from "@/services/api/http";
 import { bustMediaUrl } from "@/services/api/media";
 import { services } from "@/services/createServices";
 import { useTheme } from "@/providers/ThemeProvider";
 import { useRideStore } from "@/stores/useRideStore";
 import type { AlertClip } from "@/types/domain";
+
+function channelLabel(channel?: string | null) {
+  if (channel === "cms") return "Cabin";
+  if (channel === "dms") return "Driver";
+  return channel || "Camera";
+}
+
+function clipDurationLabel(startAt: number, endAt: number) {
+  if (!startAt || !endAt || endAt <= startAt) return null;
+  const sec = Math.max(1, Math.round((endAt - startAt) / 1000));
+  return `~${sec}s`;
+}
 
 export function EvidenceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,6 +37,7 @@ export function EvidenceScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Only place the app reads clip id — from the alert payload.
   const clipId = alert?.clipId || null;
 
   useEffect(() => {
@@ -42,10 +56,16 @@ export function EvidenceScreen() {
         if (!alive) return;
         setClip(next);
       })
-      .catch((err: Error) => {
+      .catch((err: unknown) => {
         if (!alive) return;
         setClip(null);
-        setError(err.message || "Clip request failed");
+        if (err instanceof ApiError && err.status === 403) {
+          setError("Sharing is off — clips return 403 until a guardian has sharing enabled.");
+        } else if (err instanceof ApiError && err.status === 404) {
+          setError("Clip not found for this ride.");
+        } else {
+          setError(err instanceof Error ? err.message : "Clip request failed");
+        }
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -59,8 +79,8 @@ export function EvidenceScreen() {
     if (!clip?.videoUrl) return "";
     const src = clip.videoUrl.replace(/"/g, "&quot;");
     return `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-<style>html,body{margin:0;padding:0;background:#000;height:100%;}video{width:100%;height:100%;object-fit:contain;}</style></head>
-<body><video controls autoplay playsinline src="${src}"></video></body></html>`;
+<style>html,body{margin:0;padding:0;background:#000;height:100%;}video{width:100%;height:100%;object-fit:contain;background:#000;}</style></head>
+<body><video controls autoplay playsinline preload="metadata" src="${src}"></video></body></html>`;
   }, [clip?.videoUrl]);
 
   if (!alert) {
@@ -71,36 +91,31 @@ export function EvidenceScreen() {
     );
   }
 
+  const duration = clip ? clipDurationLabel(clip.startAt, clip.endAt) : null;
+
   return (
-    <Page title={alert.title} subtitle={`${clock(alert.at)} · ${alert.channel || alert.kind}`} back>
+    <Page
+      title={alert.title}
+      subtitle={`${channelLabel(alert.channel)} · ${clock(alert.at)}`}
+      back
+    >
       <View style={[styles.card, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}>
-        <AppText variant="strong">{alert.severity}</AppText>
         <AppText variant="body">{alert.detail}</AppText>
         <AppText variant="caption">
-          {clock(alert.at)} · {alert.kind} · {alert.origin}
-          {alert.channel ? ` · ${alert.channel}` : ""}
-        </AppText>
-        {alert.confidence != null ? (
-          <AppText variant="caption">confidence {alert.confidence}</AppText>
-        ) : null}
-        <AppText variant="caption">
-          {clipId ? `clipId: ${clipId}` : "clipId: null — this alert has no clip yet"}
+          {alert.severity}
+          {clipId ? ` · clip ${clipId}` : " · no clip"}
         </AppText>
       </View>
 
       {!clipId ? (
         <ScreenState
           kind="empty"
-          title="No clip stored"
-          body={
-            liveMode
-              ? "Read clipId only from the alert. GET /clips/{clipId} when that field is set."
-              : "Evidence media is not bundled for this event."
-          }
+          title="No clip for this alert"
+          body="clipId is null on this alert. Only alerts with a clipId expose GET /clips/{clipId}."
         />
       ) : null}
 
-      {clipId && loading ? <ScreenState kind="loading" title="Loading alert clip" /> : null}
+      {clipId && loading ? <ScreenState kind="loading" title="Loading clip" /> : null}
 
       {clipId && !loading && error ? (
         <ScreenState
@@ -123,37 +138,43 @@ export function EvidenceScreen() {
       {clipId && !loading && !error && clip ? (
         <View style={styles.stack}>
           <AppText variant="strong">
-            {clip.channel.toUpperCase()} clip
-            {clip.videoUrl ? " · mp4" : ` · ${clip.frames.length} frames`}
+            {channelLabel(clip.channel)} clip
+            {duration ? ` · ${duration}` : ""}
+            {clip.videoUrl ? " · MP4" : ""}
           </AppText>
+          {clip.startAt && clip.endAt ? (
+            <AppText variant="caption">
+              {clock(clip.startAt)} – {clock(clip.endAt)}
+            </AppText>
+          ) : null}
 
           {clip.videoUrl ? (
-            <View style={[styles.player, { borderColor: colors.line }]}>
-              <WebView
-                originWhitelist={["*"]}
-                source={{ html: videoHtml }}
-                style={styles.webview}
-                allowsInlineMediaPlayback
-                mediaPlaybackRequiresUserAction={false}
-              />
-            </View>
+            <>
+              <View style={[styles.player, { borderColor: colors.line }]}>
+                <WebView
+                  originWhitelist={["*"]}
+                  source={{ html: videoHtml }}
+                  style={styles.webview}
+                  allowsInlineMediaPlayback
+                  mediaPlaybackRequiresUserAction={false}
+                  allowsFullscreenVideo
+                />
+              </View>
+              <Pressable onPress={() => void Linking.openURL(clip.videoUrl!)} hitSlop={8}>
+                <AppText variant="caption" style={{ color: colors.signal }}>
+                  Open MP4 in browser
+                </AppText>
+              </Pressable>
+            </>
           ) : (
             <AppText variant="caption">
-              videoUrl is null — the car could not encode the MP4. Showing still frames instead.
+              videoUrl is null — encoder did not produce an MP4. Showing still frames.
             </AppText>
           )}
 
-          {clip.videoUrl ? (
-            <Pressable onPress={() => void Linking.openURL(clip.videoUrl!)} hitSlop={8}>
-              <AppText variant="caption" style={{ color: colors.signal }}>
-                Open MP4 externally
-              </AppText>
-            </Pressable>
-          ) : null}
-
           {clip.frames.length > 0 ? (
             <>
-              <AppText variant="caption">Frame stills around the alert</AppText>
+              <AppText variant="caption">{clip.frames.length} stills</AppText>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
                 {clip.frames.map((frame) => (
                   <View key={`${frame.at}-${frame.imageUrl}`} style={[styles.thumb, { borderColor: colors.line }]}>
@@ -186,7 +207,7 @@ const styles = StyleSheet.create({
   },
   stack: { gap: 10 },
   player: {
-    height: 220,
+    height: 240,
     borderRadius: 18,
     overflow: "hidden",
     borderWidth: 1,
@@ -195,12 +216,12 @@ const styles = StyleSheet.create({
   webview: { flex: 1, backgroundColor: "#000" },
   row: { gap: 10, paddingVertical: 4 },
   thumb: {
-    width: 160,
+    width: 140,
     borderRadius: 16,
     overflow: "hidden",
     borderWidth: 1,
     gap: 4,
     paddingBottom: 6,
   },
-  image: { width: "100%", height: 120 },
+  image: { width: "100%", height: 110 },
 });

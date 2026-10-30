@@ -38,7 +38,8 @@ Do not put these in the app: `MEDIA_DEVICE_KEY`, `LIVEKIT_API_SECRET`, MQTT pass
 | VLM text | `GET /v1/rides/{rideId}/analysis?channel=dms` or `cms`, then socket `analysis` |
 | Live still | `GET /v1/rides/{rideId}/frames/live?channel=dms` or `cms`, then load `url` |
 | Live video | `GET /v1/rides/{rideId}/video` starts it. `POST /v1/rides/{rideId}/video/cancel` stops it |
-| Past trips | `GET /v1/history?deviceId=orin-nano-01` |
+| Past trips | `GET /v1/history?deviceId=orin-nano-01`. Several rows share `id: ride-1842`. Switch trips with `startedAt`. |
+| Past trip map | `GET /v1/rides/ride-1842?startedAt={startedAt}` and draw `route` |
 | Alert clip | `alerts[].clipId` from `GET /v1/rides/{rideId}/alerts`, then `GET /v1/rides/{rideId}/clips/{clipId}` |
 | SOS | `POST /v1/rides/{rideId}/sos` |
 | Cabin seats | `GET /v1/rides/{rideId}/cabin` |
@@ -79,7 +80,11 @@ There is no `PATCH` or `DELETE` for guardians, rides, or alerts.
   "publisherOnline": true,
   "status": "active",
   "startedAt": 1761560000000,
-  "endedAt": null
+  "endedAt": null,
+  "route": [
+    { "latitude": 12.9716, "longitude": 77.5946 },
+    { "latitude": 12.9800, "longitude": 77.6100 }
+  ]
 }
 ```
 
@@ -90,7 +95,9 @@ There is no `PATCH` or `DELETE` for guardians, rides, or alerts.
 | `deviceState` | `online` or `offline`. This is the vehicle heartbeat. |
 | `publisherOnline` | `true` when a video frame arrived in the last minute |
 | `status` | `active` or `ended` |
-| `startedAt` / `endedAt` | epoch ms, or `null` |
+| `startedAt` / `endedAt` | epoch ms, or `null`. On a history open, these are the selected trip, not a new ride id. |
+| `route` | Ordered GPS points for the map. Empty array when that trip has no fix. One point is a pin, not a line. At most 200 points. |
+| `position` | Last known point. Use it for the car marker. On a history open this is the trip's end pin. |
 | `score` | integer. Starts at 98. SOS drops it by 20 (floor 8). High or critical alerts drop it by 8 (floor 46). |
 
 Seat `id`: `driver`, `front`, `rear-left`, `rear-right`.
@@ -105,9 +112,15 @@ Seat `id`: `driver`, `front`, `rear-left`, `rear-right`.
 
 ## History
 
+The phone keeps one ride id, `ride-1842`. Each time the vehicle runs, the API stores another trip under that same id. The trip key is `startedAt` (epoch ms). Do not mint a new ride id per trip, and do not key the list on `id` alone: every row has `id: "ride-1842"`.
+
+The list still loads when the Jetson is offline. `deviceState` on the live ride tells you the car is offline. The saved trips stay.
+
+### List
+
 `GET /v1/history?deviceId=orin-nano-01`
 
-Newest `startedAt` first. Omit `deviceId` to list every ride.
+Newest `startedAt` first. Omit `deviceId` to list every device.
 
 ```json
 {
@@ -116,18 +129,74 @@ Newest `startedAt` first. Omit `deviceId` to list every ride.
       "id": "ride-1842",
       "deviceId": "orin-nano-01",
       "passenger": "Meera Shah",
-      "status": "active",
+      "status": "ended",
       "startedAt": 1761560000000,
+      "endedAt": 1761563600000,
+      "safetyStatus": "caution",
+      "score": 82,
+      "alertCount": 2,
+      "start": { "latitude": 12.9716, "longitude": 77.5946 },
+      "end": { "latitude": 12.9800, "longitude": 77.6100 }
+    },
+    {
+      "id": "ride-1842",
+      "deviceId": "orin-nano-01",
+      "passenger": "Meera Shah",
+      "status": "active",
+      "startedAt": 1761567200000,
       "endedAt": null,
       "safetyStatus": "safe",
       "score": 98,
-      "alertCount": 2
+      "alertCount": 0,
+      "start": { "latitude": 12.9800, "longitude": 77.6100 },
+      "end": { "latitude": 12.9850, "longitude": 77.6200 }
     }
   ]
 }
 ```
 
-Open one trip with `GET /v1/rides/{id}` and `GET /v1/rides/{id}/alerts`. This list does not record each time the device came online. Use `deviceState` on the current ride for that.
+| Field | Use on the history row |
+|---|---|
+| `startedAt` | Identity of this trip. Pass it when the user opens the row. |
+| `endedAt` | `null` while that trip is still the open one. |
+| `status` | `active` or `ended` |
+| `start` / `end` | Pins for the row. Either can be `null` when GPS was missing. |
+| `alertCount` | Number on the row. |
+
+### Map for the trip the user opened
+
+`GET /v1/rides/ride-1842?startedAt=1761560000000`
+
+Same Ride object as the live screen, plus the selected trip's `startedAt`, `endedAt`, `status`, `score`, `safetyStatus`, and `route`.
+
+```json
+{
+  "id": "ride-1842",
+  "startedAt": 1761560000000,
+  "endedAt": 1761563600000,
+  "status": "ended",
+  "position": { "latitude": 12.9800, "longitude": 77.6100 },
+  "route": [
+    { "latitude": 12.9716, "longitude": 77.5946 },
+    { "latitude": 12.9750, "longitude": 77.6020 },
+    { "latitude": 12.9800, "longitude": 77.6100 }
+  ]
+}
+```
+
+Draw `route` in order as the polyline. Put the car marker on `position` (the last point). `start` from the history row is the other pin.
+
+| `route` | What to draw |
+|---|---|
+| `[]` | No GPS for that trip. Show the trip card without a line. |
+| one point | A single marker. Do not draw a line. |
+| two or more | Polyline from first to last, marker on the last point. |
+
+An unknown `startedAt` still returns `200` and `route: []`. It does not 404.
+
+Leave `startedAt` off (`GET /v1/rides/ride-1842`) for the live home screen. That returns the newest trip that already has a GPS point, which may be the open trip.
+
+`GET /v1/rides/{id}/alerts` is unchanged and is not filtered by `startedAt`. Alerts on the history map are still every alert for `ride-1842`. `coordinate.latitude` / `coordinate.longitude` on an alert is where to drop that alert pin when those values are not null.
 
 ---
 

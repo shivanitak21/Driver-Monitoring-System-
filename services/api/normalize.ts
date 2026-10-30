@@ -79,6 +79,23 @@ export function normalizeSafetyStatus(value: unknown): SafetyStatus {
   return SAFETY_STATUSES.includes(value as SafetyStatus) ? (value as SafetyStatus) : "safe";
 }
 
+function normalizeLatLng(
+  raw: { latitude?: unknown; longitude?: unknown } | null | undefined,
+): Coordinate | null {
+  if (!raw || typeof raw !== "object") return null;
+  const latitude = asNumber(raw.latitude);
+  const longitude = asNumber(raw.longitude);
+  if (latitude == null || longitude == null) return null;
+  return { latitude, longitude };
+}
+
+function normalizeRoute(raw: unknown): Coordinate[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((point) => normalizeLatLng(point as { latitude?: unknown; longitude?: unknown }))
+    .filter((point): point is Coordinate => Boolean(point));
+}
+
 export function normalizeRide(raw: Partial<RideDto> | null | undefined): RideDto | null {
   if (!raw || typeof raw !== "object") return null;
   const id = asString(raw.id);
@@ -107,6 +124,7 @@ export function normalizeRide(raw: Partial<RideDto> | null | undefined): RideDto
     status: raw.status === "ended" ? "ended" : "active",
     startedAt: asNumber(raw.startedAt),
     endedAt: asNumber(raw.endedAt),
+    route: normalizeRoute(raw.route),
   };
 }
 
@@ -211,6 +229,8 @@ export function normalizeHistoryRide(raw: Partial<HistoryRideDto> | null | undef
     safetyStatus: normalizeSafetyStatus(raw.safetyStatus),
     score: asNumber(raw.score, 0) ?? 0,
     alertCount: asNumber(raw.alertCount, 0) ?? 0,
+    start: normalizeLatLng(raw.start),
+    end: normalizeLatLng(raw.end),
   };
 }
 

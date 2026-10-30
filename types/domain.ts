@@ -73,18 +73,25 @@ export type PastTrip = {
   heading: number;
 };
 
-/** Ride row from GET /v1/history */
+/** Ride row from GET /v1/history — many rows can share the same `id`; key by startedAt. */
 export type HistoryRide = {
   id: string;
   deviceId: string;
   passenger: string;
   status: "active" | "ended";
+  /** Trip identity for this row (epoch ms). */
   startedAt: number | null;
   endedAt: number | null;
   safetyStatus: SafetyStatus;
   score: number;
   alertCount: number;
+  start: Coordinate | null;
+  end: Coordinate | null;
 };
+
+export function historyTripKey(trip: Pick<HistoryRide, "id" | "startedAt">) {
+  return `${trip.id}:${trip.startedAt ?? "live"}`;
+}
 
 export type Seat = {
   id: string;

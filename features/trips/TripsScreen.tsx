@@ -9,13 +9,15 @@ import { ApiStatusBanner } from "@/components/system/ApiStatusBanner";
 import { StatusChip } from "@/components/system/StatusChip";
 import { AppText } from "@/components/ui/AppText";
 import { ScreenState } from "@/components/ui/ScreenState";
-import { clock, timeAgo } from "@/constants/format";
+import { timeAgo } from "@/constants/format";
 import { formatEta, formatSpeed, liveMapGeometry, rideStatusLabel } from "@/constants/liveMap";
 import { pastTrips } from "@/data/fleet";
 import { routeLine, shiftLine } from "@/data/route";
 import { useLiveApiRefresh } from "@/hooks/useLiveApiRefresh";
 import { useTheme } from "@/providers/ThemeProvider";
 import { tripHeadline, useRideStore, useSafetyIndex } from "@/stores/useRideStore";
+import { historyTripKey } from "@/types/domain";
+import { rideDate } from "@/constants/format";
 
 export function TripsScreen() {
   useLiveApiRefresh("all");
@@ -111,11 +113,17 @@ export function TripsScreen() {
             </AppText>
             {history.map((trip) => (
               <TripHistoryCard
-                key={trip.id}
+                key={historyTripKey(trip)}
                 title={trip.passenger || trip.id}
-                meta={`${trip.status} · score ${trip.score} · ${trip.alertCount} alerts${trip.startedAt ? ` · ${clock(trip.startedAt)}` : ""}`}
+                meta={`${trip.status} · score ${trip.score} · ${trip.alertCount} alerts${trip.startedAt ? ` · ${rideDate(trip.startedAt)}` : ""}`}
                 status={trip.safetyStatus}
-                onPress={() => router.push(`/trip/${trip.id}`)}
+                onPress={() => {
+                  const qs =
+                    trip.startedAt != null
+                      ? `?startedAt=${encodeURIComponent(String(trip.startedAt))}`
+                      : "";
+                  router.push(`/trip/${trip.id}${qs}`);
+                }}
               />
             ))}
           </>

@@ -40,7 +40,7 @@ import type {
 
 export type GuardianApi = {
   health(): Promise<HealthDto>;
-  getRide(rideId: string): Promise<RideDto>;
+  getRide(rideId: string, startedAt?: number | null): Promise<RideDto>;
   listHistory(deviceId?: string): Promise<HistoryRide[]>;
   listAlerts(rideId: string, status?: AlertStatusFilter, channel?: MediaChannel): Promise<SafetyAlert[]>;
   acknowledgeAlert(alertId: string): Promise<SafetyAlert>;
@@ -73,8 +73,13 @@ export function createGuardianApi(): GuardianApi {
       return apiRequest<HealthDto>("/health");
     },
 
-    async getRide(rideId) {
-      const raw = await apiRequest<RideDto>(`/v1/rides/${encodeURIComponent(rideId)}`);
+    async getRide(rideId, startedAt) {
+      const raw = await apiRequest<RideDto>(`/v1/rides/${encodeURIComponent(rideId)}`, {
+        query:
+          startedAt != null && Number.isFinite(startedAt)
+            ? { startedAt: Math.trunc(startedAt) }
+            : undefined,
+      });
       return requireRide(normalizeRide(raw));
     },
 

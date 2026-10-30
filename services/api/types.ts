@@ -32,6 +32,8 @@ export type RideDto = {
   status: "active" | "ended";
   startedAt: number | null;
   endedAt: number | null;
+  /** Ordered GPS points for map (history open / ride payload). Max ~200. */
+  route?: { latitude: number | null; longitude: number | null }[] | null;
 };
 
 export type AlertDto = {
@@ -94,6 +96,8 @@ export type HistoryRideDto = {
   safetyStatus: SafetyStatus;
   score: number;
   alertCount: number;
+  start?: { latitude: number | null; longitude: number | null } | null;
+  end?: { latitude: number | null; longitude: number | null } | null;
 };
 
 export type AnalysisDto = RideAnalysis;
