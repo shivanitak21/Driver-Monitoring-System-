@@ -1,11 +1,12 @@
 import { wsBaseUrl } from "@/services/api/config";
 import { normalizeAlert, normalizeRide } from "@/services/api/normalize";
 import type { LiveEvent, RideDto } from "@/services/api/types";
-import type { SafetyAlert } from "@/types/domain";
+import type { AnalysisSide, MediaChannel, SafetyAlert } from "@/types/domain";
 
 export type LiveSocketHandlers = {
   onRide?: (ride: RideDto) => void;
   onAlert?: (alert: SafetyAlert, ride: RideDto, kind: "alert" | "sos", notified?: string[]) => void;
+  onAnalysis?: (channel: MediaChannel, analysis: AnalysisSide) => void;
   onOpen?: () => void;
   onClose?: (code: number) => void;
   onError?: (error: Error) => void;
@@ -51,6 +52,13 @@ export function connectLiveSocket(rideId: string, handlers: LiveSocketHandlers):
       const alert = normalizeAlert(msg.alert);
       if (!ride || !alert) return;
       handlers.onAlert?.(alert, ride, msg.type, msg.type === "sos" ? msg.notified : undefined);
+      return;
+    }
+
+    if (msg.type === "analysis") {
+      const channel = msg.channel === "cms" ? "cms" : msg.channel === "dms" ? "dms" : null;
+      if (!channel || !msg.analysis) return;
+      handlers.onAnalysis?.(channel, msg.analysis);
     }
   };
 

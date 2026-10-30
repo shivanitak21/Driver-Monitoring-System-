@@ -54,6 +54,9 @@ export function SettingsScreen() {
       {apiEnabled ? (
         <AppText variant="caption" style={{ marginTop: 8 }}>
           Link status: {liveMode ? connection : "idle"} · docs at /docs
+          {"\n"}Integrated: ride + live socket, telemetry, alerts/ack, analysis, frames, video token, history,
+          clips, SOS, cabin, guardians/share, notices. Push-token client ready (no device push UI yet). LiveKit
+          moving video needs a native LiveKit client — Expo Go shows JPEG stills.
         </AppText>
       ) : null}
 

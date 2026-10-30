@@ -13,6 +13,10 @@ export function useLiveApiRefresh(
   const refreshGuardians = useRideStore((state) => state.refreshGuardians);
   const refreshNotices = useRideStore((state) => state.refreshNotices);
   const refreshCabin = useRideStore((state) => state.refreshCabin);
+  const refreshFrames = useRideStore((state) => state.refreshFrames);
+  const refreshAnalysis = useRideStore((state) => state.refreshAnalysis);
+  const refreshVideo = useRideStore((state) => state.refreshVideo);
+  const refreshHistory = useRideStore((state) => state.refreshHistory);
 
   useFocusEffect(
     useCallback(() => {
@@ -26,22 +30,31 @@ export function useLiveApiRefresh(
         return;
       }
       if (kind === "cabin") {
-        void refreshCabin();
+        void Promise.all([
+          refreshCabin(),
+          refreshFrames(),
+          refreshAnalysis(),
+          refreshVideo().catch(() => undefined),
+        ]);
         return;
       }
       if (kind === "notices") {
         void refreshNotices();
         return;
       }
-      void refreshAll();
+      void refreshAll().then(() => refreshHistory().catch(() => undefined));
     }, [
       kind,
       liveMode,
       refreshAlerts,
       refreshAll,
+      refreshAnalysis,
       refreshCabin,
+      refreshFrames,
       refreshGuardians,
+      refreshHistory,
       refreshNotices,
+      refreshVideo,
     ]),
   );
 }

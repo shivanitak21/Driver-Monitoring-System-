@@ -1,11 +1,16 @@
 import { apiRequest } from "@/services/api/http";
 import {
   normalizeAlert,
+  normalizeAlertClip,
   normalizeAlerts,
+  normalizeAnalysis,
   normalizeCabin,
   normalizeGuardians,
+  normalizeHistoryRides,
+  normalizeLiveFrame,
   normalizeNotices,
   normalizeRide,
+  normalizeVideoSession,
 } from "@/services/api/normalize";
 import type {
   AlertStatusFilter,
@@ -18,16 +23,31 @@ import type {
   SosResponse,
   TelemetryRequest,
 } from "@/services/api/types";
-import type { Guardian, GuardianNotice, SafetyAlert } from "@/types/domain";
+import type {
+  AlertClip,
+  Guardian,
+  GuardianNotice,
+  HistoryRide,
+  LiveFrame,
+  MediaChannel,
+  RideAnalysis,
+  SafetyAlert,
+  VideoSession,
+} from "@/types/domain";
 
 export type GuardianApi = {
   health(): Promise<HealthDto>;
   getRide(rideId: string): Promise<RideDto>;
-  listAlerts(rideId: string, status?: AlertStatusFilter): Promise<SafetyAlert[]>;
+  listHistory(deviceId?: string): Promise<HistoryRide[]>;
+  listAlerts(rideId: string, status?: AlertStatusFilter, channel?: MediaChannel): Promise<SafetyAlert[]>;
   acknowledgeAlert(alertId: string): Promise<SafetyAlert>;
   raiseSos(rideId: string, body?: SosRequest): Promise<SosResponse>;
   postTelemetry(rideId: string, body: TelemetryRequest): Promise<RideDto>;
   getCabin(rideId: string): Promise<CabinDto>;
+  getAnalysis(rideId: string, channel?: MediaChannel): Promise<RideAnalysis>;
+  getLiveFrame(rideId: string, channel: MediaChannel): Promise<LiveFrame>;
+  getVideo(rideId: string, track?: "all" | "driver" | "cabin"): Promise<VideoSession>;
+  getClip(rideId: string, clipId: string): Promise<AlertClip>;
   listGuardians(rideId: string): Promise<Guardian[]>;
   addGuardian(rideId: string, body: CreateGuardianRequest): Promise<{ id: string }>;
   toggleSharing(rideId: string, guardianId: string): Promise<{ id: string; sharing: boolean }>;
@@ -52,10 +72,17 @@ export function createGuardianApi(): GuardianApi {
       return requireRide(normalizeRide(raw));
     },
 
-    async listAlerts(rideId, status = "all") {
+    async listHistory(deviceId) {
+      const raw = await apiRequest<{ rides?: unknown }>("/v1/history", {
+        query: deviceId ? { deviceId } : undefined,
+      });
+      return normalizeHistoryRides(raw?.rides);
+    },
+
+    async listAlerts(rideId, status = "all", channel) {
       const raw = await apiRequest<{ alerts?: unknown }>(
         `/v1/rides/${encodeURIComponent(rideId)}/alerts`,
-        { query: { status } },
+        { query: { status, channel } },
       );
       return normalizeAlerts(raw?.alerts);
     },
@@ -95,6 +122,10 @@ export function createGuardianApi(): GuardianApi {
           acknowledged: alert.acknowledged,
           evidenceId: alert.evidenceId ?? null,
           origin: alert.origin,
+          orinType: alert.orinType,
+          channel: alert.channel,
+          confidence: alert.confidence,
+          clipId: alert.clipId,
         },
       };
     },
@@ -112,6 +143,42 @@ export function createGuardianApi(): GuardianApi {
       const cabin = normalizeCabin(raw);
       if (!cabin) throw new Error("Invalid cabin payload from the API.");
       return cabin;
+    },
+
+    async getAnalysis(rideId, channel) {
+      const raw = await apiRequest(`/v1/rides/${encodeURIComponent(rideId)}/analysis`, {
+        query: channel ? { channel } : undefined,
+      });
+      const analysis = normalizeAnalysis(raw as never);
+      if (!analysis) throw new Error("Invalid analysis payload from the API.");
+      return analysis;
+    },
+
+    async getLiveFrame(rideId, channel) {
+      const raw = await apiRequest(`/v1/rides/${encodeURIComponent(rideId)}/frames/live`, {
+        query: { channel },
+      });
+      const frame = normalizeLiveFrame(raw as never);
+      if (!frame) throw new Error("Invalid live frame payload from the API.");
+      return frame;
+    },
+
+    async getVideo(rideId, track = "all") {
+      const raw = await apiRequest(`/v1/rides/${encodeURIComponent(rideId)}/video`, {
+        query: { track },
+      });
+      const session = normalizeVideoSession(raw as never);
+      if (!session) throw new Error("Invalid video session payload from the API.");
+      return session;
+    },
+
+    async getClip(rideId, clipId) {
+      const raw = await apiRequest(
+        `/v1/rides/${encodeURIComponent(rideId)}/clips/${encodeURIComponent(clipId)}`,
+      );
+      const clip = normalizeAlertClip(raw as never);
+      if (!clip) throw new Error("Invalid clip payload from the API.");
+      return clip;
     },
 
     async listGuardians(rideId) {

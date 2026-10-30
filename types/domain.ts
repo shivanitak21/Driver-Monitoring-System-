@@ -20,6 +20,8 @@ export type Severity = "info" | "low" | "medium" | "high" | "critical";
 
 export type DriverState = "attentive" | "drowsy" | "distracted" | "unavailable";
 
+export type MediaChannel = "dms" | "cms";
+
 export type SafetyAlert = {
   id: string;
   tripId: string;
@@ -33,6 +35,10 @@ export type SafetyAlert = {
   acknowledged: boolean;
   evidenceId?: string;
   origin: DataOrigin;
+  channel?: MediaChannel;
+  orinType?: string;
+  confidence?: number | null;
+  clipId?: string | null;
 };
 
 export type Guardian = {
@@ -67,6 +73,19 @@ export type PastTrip = {
   heading: number;
 };
 
+/** Ride row from GET /v1/history */
+export type HistoryRide = {
+  id: string;
+  deviceId: string;
+  passenger: string;
+  status: "active" | "ended";
+  startedAt: number | null;
+  endedAt: number | null;
+  safetyStatus: SafetyStatus;
+  score: number;
+  alertCount: number;
+};
+
 export type Seat = {
   id: string;
   label: string;
@@ -86,3 +105,49 @@ export type CallSession = {
 };
 
 export type RiskSeverity = "none" | "low" | "medium" | "high" | "critical";
+
+export type AnalysisSide = {
+  scene: string;
+  hazards: string[];
+  confidence: number;
+  suppressed: string[];
+  observations: Record<string, unknown>;
+  at: number;
+};
+
+export type RideAnalysis = {
+  deviceId: string;
+  updatedAt: number;
+  dms: AnalysisSide | null;
+  cms: AnalysisSide | null;
+};
+
+export type LiveFrame = {
+  rideId: string;
+  channel: MediaChannel;
+  at: number;
+  /** Absolute URL for Image source */
+  imageUrl: string;
+};
+
+export type VideoSession = {
+  url: string;
+  mode: "livekit" | "dummy";
+  token: string;
+  room: string;
+  tracks: string[];
+  expiresAt: number;
+  publisherOnline: boolean;
+  previewUrl: string;
+};
+
+export type AlertClip = {
+  id: string;
+  rideId: string;
+  alertId: string;
+  channel: MediaChannel;
+  startAt: number;
+  endAt: number;
+  frames: { at: number; imageUrl: string }[];
+  videoUrl: string | null;
+};

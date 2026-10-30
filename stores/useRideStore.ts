@@ -12,20 +12,27 @@ import {
 } from "@/data/fleet";
 import { DESTINATION_LABEL, ORIGIN_LABEL, labelAt, routeTotalM, sampleAt, shiftCoordinate } from "@/data/route";
 import { defaultDeviceId, defaultRideId } from "@/services/api/config";
+// defaultDeviceId used by bootstrapLive / refreshHistory
 import type { AlertStatusFilter, RideDto } from "@/services/api/types";
 import { describeServiceError, services } from "@/services/createServices";
 import { assess, riskLine, type RiskAssessment } from "@/services/risk";
 import type {
   AlertKind,
+  AnalysisSide,
   CallMode,
   CallSession,
   Coordinate,
   DriverState,
   Guardian,
   GuardianNotice,
+  HistoryRide,
+  LiveFrame,
+  MediaChannel,
+  RideAnalysis,
   SafetyAlert,
   SafetyStatus,
   Seat,
+  VideoSession,
 } from "@/types/domain";
 
 const HOUR = 1000 * 60 * 60;
@@ -213,8 +220,17 @@ type RideState = {
   seats: Seat[];
   passengerName: string;
   deviceState: string;
+  publisherOnline: boolean;
+  rideStatus: "active" | "ended";
+  startedAt: number | null;
+  endedAt: number | null;
   updatedAt: string | null;
   shareLink: string | null;
+  history: HistoryRide[];
+  analysis: RideAnalysis | null;
+  frameDms: LiveFrame | null;
+  frameCms: LiveFrame | null;
+  videoSession: VideoSession | null;
   fired: string[];
   alerts: SafetyAlert[];
   guardians: Guardian[];
@@ -242,12 +258,17 @@ type RideState = {
   endCall: () => void;
   applyRide: (ride: RideDto) => void;
   prependAlert: (alert: SafetyAlert) => void;
+  patchAnalysis: (channel: MediaChannel, side: AnalysisSide) => void;
   setConnection: (connection: ConnectionState, error?: string | null) => void;
   bootstrapLive: () => Promise<void>;
-  refreshAlerts: (status?: AlertStatusFilter) => Promise<void>;
+  refreshAlerts: (status?: AlertStatusFilter, channel?: MediaChannel) => Promise<void>;
   refreshGuardians: () => Promise<void>;
   refreshNotices: () => Promise<void>;
   refreshCabin: () => Promise<void>;
+  refreshHistory: () => Promise<void>;
+  refreshAnalysis: () => Promise<void>;
+  refreshFrames: () => Promise<void>;
+  refreshVideo: () => Promise<void>;
   refreshAll: () => Promise<void>;
   publishTelemetry: (fix: Coordinate) => Promise<void>;
 };
@@ -283,7 +304,7 @@ export const useRideStore = create<RideState>()(
       follow: true,
       offlineOverride: false,
       feedFault: false,
-      cabinConsent: false,
+      cabinConsent: true,
       showDeviceLocation: false,
       deviceFix: null,
       routeShift: null,
@@ -304,8 +325,17 @@ export const useRideStore = create<RideState>()(
       seats: liveMode ? [] : initialSeats,
       passengerName: liveMode ? "" : passenger.name,
       deviceState: liveMode ? "unknown" : "online",
+      publisherOnline: false,
+      rideStatus: "active",
+      startedAt: null,
+      endedAt: null,
       updatedAt: null,
       shareLink: `vms://trip/${defaultRideId()}`,
+      history: [],
+      analysis: null,
+      frameDms: null,
+      frameCms: null,
+      videoSession: null,
       fired: [],
       alerts: liveMode ? [] : seededAlerts,
       guardians: liveMode ? [] : initialGuardians,
@@ -664,6 +694,10 @@ export const useRideStore = create<RideState>()(
           safetyStatus: ride.safetyStatus,
           driverState: ride.driverState,
           deviceState: ride.deviceState || state.deviceState,
+          publisherOnline: typeof ride.publisherOnline === "boolean" ? ride.publisherOnline : state.publisherOnline,
+          rideStatus: ride.status === "ended" ? "ended" : "active",
+          startedAt: ride.startedAt ?? state.startedAt,
+          endedAt: ride.endedAt ?? state.endedAt,
           updatedAt: ride.updatedAt || state.updatedAt,
           score: typeof ride.score === "number" ? ride.score : state.score,
           seats: Array.isArray(ride.seats) ? ride.seats : state.seats,
@@ -680,6 +714,17 @@ export const useRideStore = create<RideState>()(
       prependAlert: (alert) => {
         set({ alerts: mergeAlert(get().alerts, alert) });
       },
+      patchAnalysis: (channel, side) => {
+        const current = get().analysis;
+        set({
+          analysis: {
+            deviceId: current?.deviceId || get().deviceId,
+            updatedAt: side.at || Date.now(),
+            dms: channel === "dms" ? side : current?.dms ?? null,
+            cms: channel === "cms" ? side : current?.cms ?? null,
+          },
+        });
+      },
       setConnection: (connection, error = null) => set({ connection, connectionError: error }),
       bootstrapLive: async () => {
         if (!services.api) {
@@ -690,11 +735,14 @@ export const useRideStore = create<RideState>()(
         try {
           const health = await services.api.health();
           const rideId = health.ride || get().rideId || defaultRideId();
-          const [ride, alerts, guardians, notices] = await Promise.all([
+          const deviceId = get().deviceId || defaultDeviceId();
+          const [ride, alerts, guardians, notices, history, analysis] = await Promise.all([
             services.api.getRide(rideId),
             services.api.listAlerts(rideId, "all"),
             services.api.listGuardians(rideId),
             services.api.listNotices(rideId),
+            services.api.listHistory(deviceId),
+            services.api.getAnalysis(rideId).catch(() => null),
           ]);
           get().applyRide(ride);
           set({
@@ -702,11 +750,15 @@ export const useRideStore = create<RideState>()(
             alerts,
             guardians,
             notices,
+            history,
+            analysis,
             booting: false,
             connection: "live",
             connectionError: null,
             lastSyncedAt: Date.now(),
           });
+          void get().refreshFrames();
+          void get().refreshVideo();
         } catch (error) {
           set({
             booting: false,
@@ -715,13 +767,15 @@ export const useRideStore = create<RideState>()(
           });
         }
       },
-      refreshAlerts: async (status = "all") => {
+      refreshAlerts: async (_status = "all", _channel) => {
         if (!services.api) return;
         set({ refreshing: true });
         try {
-          const alerts = await services.api.listAlerts(get().rideId, status);
+          // Always pull the full ride alert list so history/events stay complete.
+          // Status/channel filters are applied in the UI.
+          const alerts = await services.api.listAlerts(get().rideId, "all");
           set({
-            alerts: status === "all" ? alerts : mergeFiltered(get().alerts, alerts, status),
+            alerts,
             refreshing: false,
             lastSyncedAt: Date.now(),
             connectionError: null,
@@ -768,27 +822,81 @@ export const useRideStore = create<RideState>()(
           throw error;
         }
       },
+      refreshHistory: async () => {
+        if (!services.api) return;
+        try {
+          const history = await services.api.listHistory(get().deviceId || defaultDeviceId());
+          set({ history, lastSyncedAt: Date.now(), connectionError: null });
+        } catch (error) {
+          set({ connectionError: describeServiceError(error) });
+          throw error;
+        }
+      },
+      refreshAnalysis: async () => {
+        if (!services.api) return;
+        try {
+          const analysis = await services.api.getAnalysis(get().rideId);
+          set({ analysis, lastSyncedAt: Date.now(), connectionError: null });
+        } catch (error) {
+          set({ connectionError: describeServiceError(error) });
+          throw error;
+        }
+      },
+      refreshFrames: async () => {
+        if (!services.api) return;
+        const rideId = get().rideId;
+        const [dms, cms] = await Promise.all([
+          services.api.getLiveFrame(rideId, "dms").catch(() => null),
+          services.api.getLiveFrame(rideId, "cms").catch(() => null),
+        ]);
+        set({
+          frameDms: dms,
+          frameCms: cms,
+          lastSyncedAt: Date.now(),
+        });
+      },
+      refreshVideo: async () => {
+        if (!services.api) return;
+        try {
+          const videoSession = await services.api.getVideo(get().rideId, "all");
+          set({
+            videoSession,
+            publisherOnline: videoSession.publisherOnline,
+            lastSyncedAt: Date.now(),
+            connectionError: null,
+          });
+        } catch (error) {
+          set({ connectionError: describeServiceError(error) });
+          throw error;
+        }
+      },
       refreshAll: async () => {
         if (!services.api) return;
         set({ refreshing: true });
         try {
           const rideId = get().rideId;
-          const [ride, alerts, guardians, notices] = await Promise.all([
+          const [ride, alerts, guardians, notices, history, analysis] = await Promise.all([
             services.api.getRide(rideId),
             services.api.listAlerts(rideId, "all"),
             services.api.listGuardians(rideId),
             services.api.listNotices(rideId),
+            services.api.listHistory(get().deviceId || defaultDeviceId()),
+            services.api.getAnalysis(rideId).catch(() => get().analysis),
           ]);
           get().applyRide(ride);
           set({
             alerts,
             guardians,
             notices,
+            history,
+            analysis,
             refreshing: false,
             connection: "live",
             connectionError: null,
             lastSyncedAt: Date.now(),
           });
+          void get().refreshFrames();
+          void get().refreshVideo();
         } catch (error) {
           set({
             refreshing: false,
@@ -844,6 +952,7 @@ export const useRideStore = create<RideState>()(
         state.guardians = [];
         state.notices = [];
         state.fired = [];
+        state.cabinConsent = true;
         state.connection = "connecting";
         state.booting = true;
       },

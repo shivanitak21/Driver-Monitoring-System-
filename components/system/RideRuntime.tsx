@@ -11,6 +11,7 @@ export function RideClock() {
   const bootstrapLive = useRideStore((state) => state.bootstrapLive);
   const applyRide = useRideStore((state) => state.applyRide);
   const prependAlert = useRideStore((state) => state.prependAlert);
+  const patchAnalysis = useRideStore((state) => state.patchAnalysis);
   const setConnection = useRideStore((state) => state.setConnection);
   const rideId = useRideStore((state) => state.rideId);
   const socketRef = useRef<LiveSocket | null>(null);
@@ -49,6 +50,9 @@ export function RideClock() {
           applyRide(ride);
           prependAlert(alert);
         },
+        onAnalysis: (channel, analysis) => {
+          if (!cancelled) patchAnalysis(channel, analysis);
+        },
         onError: () => {
           if (!cancelled) setConnection("degraded", "Live updates interrupted.");
         },
@@ -72,7 +76,7 @@ export function RideClock() {
       socketRef.current?.close();
       socketRef.current = null;
     };
-  }, [applyRide, liveMode, prependAlert, rideId, setConnection]);
+  }, [applyRide, liveMode, patchAnalysis, prependAlert, rideId, setConnection]);
 
   return null;
 }

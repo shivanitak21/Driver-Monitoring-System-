@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import { useLocalSearchParams } from "expo-router";
 
 import { Page } from "@/components/layout/Page";
+import { LiveStill } from "@/components/media/LiveStill";
 import { SeatOccupancyGrid } from "@/components/safety/SeatOccupancyGrid";
 import { ApiStatusBanner } from "@/components/system/ApiStatusBanner";
 import { StatusChip } from "@/components/system/StatusChip";
@@ -33,13 +34,25 @@ export function VehicleScreen() {
   const position = useRideStore((state) => state.position);
   const safetyStatus = useRideStore((state) => state.safetyStatus);
   const driverState = useRideStore((state) => state.driverState);
+  const publisherOnline = useRideStore((state) => state.publisherOnline);
+  const score = useRideStore((state) => state.score);
+  const frameDms = useRideStore((state) => state.frameDms);
+  const frameCms = useRideStore((state) => state.frameCms);
   const liveMode = useRideStore((state) => state.liveMode);
   const refreshAll = useRideStore((state) => state.refreshAll);
+  const refreshFrames = useRideStore((state) => state.refreshFrames);
   const refreshing = useRideStore((state) => state.refreshing);
   const { colors } = useTheme();
-  const [tab, setTab] = useState("exterior");
+  const [tab, setTab] = useState(liveMode ? "cameras" : "exterior");
   const [interior, setInterior] = useState(0);
   const deviceOnline = (deviceState || "").toLowerCase() === "online";
+
+  useEffect(() => {
+    if (!liveMode) return;
+    void refreshFrames();
+    const id = setInterval(() => void refreshFrames(), 5000);
+    return () => clearInterval(id);
+  }, [liveMode, refreshFrames]);
 
   const enrolledIds = new Set([deviceId, DEVICE_ID, VEHICLE_ID, "bmw-m5"].filter(Boolean));
   if (!enrolledIds.has(id)) {
@@ -67,8 +80,10 @@ export function VehicleScreen() {
           <ApiStatusBanner onRetry={() => void refreshAll()} />
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
             <StatusChip label={safetyStatus} tone={safetyStatus === "safe" ? "ok" : safetyStatus === "caution" ? "warn" : "danger"} />
-            <StatusChip label={deviceState || "device"} tone={deviceOnline ? "ok" : "warn"} />
+            <StatusChip label={deviceOnline ? "device online" : "device offline"} tone={deviceOnline ? "ok" : "warn"} />
             <StatusChip label={driverState} tone={driverState === "attentive" ? "ok" : "danger"} />
+            <StatusChip label={publisherOnline ? "camera online" : "camera offline"} tone={publisherOnline ? "ok" : "warn"} />
+            <StatusChip label={`score ${score}`} tone={score >= 80 ? "ok" : score >= 50 ? "warn" : "danger"} />
           </View>
           <AppText variant="caption">{formatCoords(position)}</AppText>
         </View>
@@ -79,12 +94,20 @@ export function VehicleScreen() {
           value={tab}
           onChange={setTab}
           items={[
+            ...(liveMode ? [{ id: "cameras", label: "Live" }] : []),
             { id: "exterior", label: "Exterior" },
             { id: "interior", label: "Interior" },
             { id: "model", label: "Orbit" },
           ]}
         />
       </View>
+
+      {tab === "cameras" && liveMode ? (
+        <View style={{ gap: 12 }}>
+          <LiveStill frame={frameDms} label="DMS · driver" height={200} />
+          <LiveStill frame={frameCms} label="CMS · cabin" height={200} />
+        </View>
+      ) : null}
 
       {tab === "exterior" ? (
         <View style={[styles.frame, { backgroundColor: colors.bgSoft }]}>
@@ -120,15 +143,13 @@ export function VehicleScreen() {
       <View style={styles.stats}>
         <Stat label="Speed" value={formatSpeed(speed)} />
         <Stat label="Heading" value={`${Math.round(heading)}°`} />
-        <Stat label="Safety score" value={`${safety.index}`} />
+        <Stat label="Score" value={`${liveMode ? score : safety.index}`} />
       </View>
       <View style={styles.seats}>
+        <AppText variant="strong" style={{ marginBottom: 10 }}>
+          Seat occupancy
+        </AppText>
         <SeatOccupancyGrid seats={seats} awaitingWhenEmpty={liveMode} />
-        {liveMode && seats.length === 0 ? (
-          <AppText variant="caption" style={{ marginTop: 8 }}>
-            Seat occupancy has not been reported by the cabin API yet.
-          </AppText>
-        ) : null}
       </View>
     </Page>
   );

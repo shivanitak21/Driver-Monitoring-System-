@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Bell, Car, LocateFixed, Phone, Settings, Video } from "@/components/ui/icons";
+import { Bell, Car, LocateFixed, Phone, Settings, Video, X } from "@/components/ui/icons";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -45,6 +45,9 @@ export function LiveMapScreen() {
   const deviceId = useRideStore((state) => state.deviceId);
   const rideId = useRideStore((state) => state.rideId);
   const deviceState = useRideStore((state) => state.deviceState);
+  const publisherOnline = useRideStore((state) => state.publisherOnline);
+  const score = useRideStore((state) => state.score);
+  const rideStatus = useRideStore((state) => state.rideStatus);
   const driverState = useRideStore((state) => state.driverState);
   const position = useRideStore((state) => state.position);
   const heading = useRideStore((state) => state.heading);
@@ -134,10 +137,20 @@ export function LiveMapScreen() {
           color: urgent ? colors.onDanger : colors.limeInk,
           fontSize: 10,
         },
+        alertBackdrop: {
+          ...StyleSheet.absoluteFillObject,
+          zIndex: 4,
+        },
         alertPanel: {
           marginTop: 8,
           width: 220,
           gap: 10,
+        },
+        alertHeader: {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
         },
         alertRow: { gap: 2 },
         bannerSlot: {
@@ -191,7 +204,15 @@ export function LiveMapScreen() {
           />
         </MapErrorBoundary>
 
-        <View style={[styles.top, { top: insets.top + 8 }]}>
+        {alertsOpen ? (
+          <Pressable
+            accessibilityLabel="Dismiss alerts"
+            onPress={() => setAlertsOpen(false)}
+            style={styles.alertBackdrop}
+          />
+        ) : null}
+
+        <View style={[styles.top, { top: insets.top + 8, zIndex: 5 }]}>
           <Glass radius={22}>
             <View style={styles.livePill}>
               <View style={{ paddingLeft: 12, paddingVertical: 10 }}>
@@ -203,23 +224,34 @@ export function LiveMapScreen() {
                     ? connection !== "live"
                       ? "Syncing"
                       : deviceOnline
-                        ? "Live"
-                        : "Offline device"
+                        ? publisherOnline
+                          ? "Live tracking"
+                          : "Live · cam off"
+                        : "Device offline"
                     : "Live"}
                 </AppText>
                 <AppText variant="caption" numberOfLines={1}>
                   {passengerName || rideId}
+                  {liveMode ? ` · ${rideStatus}` : ""}
                 </AppText>
               </View>
             </View>
           </Glass>
           <View style={styles.tools}>
             <View>
-              <IconButton label="Alerts" testID="home-alerts" onPress={() => setAlertsOpen((open) => !open)}>
-                <Bell size={18} color={colors.ink} strokeWidth={1.75} />
+              <IconButton
+                label={alertsOpen ? "Close alerts" : "Alerts"}
+                testID="home-alerts"
+                onPress={() => setAlertsOpen((open) => !open)}
+              >
+                {alertsOpen ? (
+                  <X size={18} color={colors.ink} strokeWidth={1.75} />
+                ) : (
+                  <Bell size={18} color={colors.ink} strokeWidth={1.75} />
+                )}
               </IconButton>
-              {openAlerts.length > 0 ? (
-                <View style={styles.badge}>
+              {!alertsOpen && openAlerts.length > 0 ? (
+                <View style={styles.badge} pointerEvents="none">
                   <AppText variant="caption" style={styles.badgeText}>
                     {openAlerts.length}
                   </AppText>
@@ -235,6 +267,19 @@ export function LiveMapScreen() {
             {alertsOpen ? (
               <Glass radius={18} padded>
                 <View style={styles.alertPanel}>
+                  <View style={styles.alertHeader}>
+                    <AppText variant="strong">Open alerts</AppText>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Close alerts"
+                      hitSlop={10}
+                      onPress={() => setAlertsOpen(false)}
+                    >
+                      <AppText variant="caption" style={{ color: colors.signal }}>
+                        Close
+                      </AppText>
+                    </Pressable>
+                  </View>
                   {alertPreview.length === 0 ? (
                     <AppText variant="caption">
                       {liveMode ? "No alerts from the API" : "No open alerts"}
@@ -244,7 +289,10 @@ export function LiveMapScreen() {
                       <Pressable
                         key={alert.id}
                         testID={`alert-chip-${alert.kind}`}
-                        onPress={() => router.push("/alerts")}
+                        onPress={() => {
+                          setAlertsOpen(false);
+                          router.push("/alerts");
+                        }}
                         style={styles.alertRow}
                       >
                         <AppText variant="strong" numberOfLines={1}>
@@ -254,6 +302,18 @@ export function LiveMapScreen() {
                       </Pressable>
                     ))
                   )}
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => {
+                      setAlertsOpen(false);
+                      router.push("/alerts");
+                    }}
+                    hitSlop={8}
+                  >
+                    <AppText variant="caption" style={{ color: colors.signal }}>
+                      View all alerts
+                    </AppText>
+                  </Pressable>
                 </View>
               </Glass>
             ) : null}
@@ -274,7 +334,7 @@ export function LiveMapScreen() {
       >
         <View style={styles.actions}>
           <MapAction testID="home-vehicle" label="Vehicle" onPress={openVehicle} icon={<Car size={18} color={colors.ink} strokeWidth={1.75} />} />
-          <MapAction testID="home-video" label="Video" onPress={() => startCall("video")} icon={<Video size={18} color={colors.ink} strokeWidth={1.75} />} />
+          <MapAction testID="home-video" label="Video" onPress={() => router.push("/cabin")} icon={<Video size={18} color={colors.ink} strokeWidth={1.75} />} />
           <MapAction testID="home-audio" label="Audio" onPress={() => startCall("audio")} icon={<Phone size={18} color={colors.ink} strokeWidth={1.75} />} />
           <View style={styles.action}>
             <SosButton onPress={askSos} />
@@ -299,10 +359,11 @@ export function LiveMapScreen() {
             <View style={styles.metrics}>
               <Metric label="ETA" value={formatEta(eta)} />
               <Metric label="Speed" value={formatSpeed(speed)} />
+              <Metric label="Score" value={String(score)} />
             </View>
             {liveMode ? (
               <AppText variant="caption" numberOfLines={2} style={{ marginTop: 8 }}>
-                {`${deviceId} · ${deviceState || "device"} · ${formatCoords(position)}`}
+                {`${deviceId} · ${deviceState || "device"} · cam ${publisherOnline ? "on" : "off"} · ${openAlerts.length} alerts · ${formatCoords(position)} · ${Math.round(heading)}°`}
               </AppText>
             ) : null}
           </View>

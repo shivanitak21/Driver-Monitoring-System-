@@ -1,18 +1,31 @@
+import { absoluteMediaUrl } from "@/services/api/media";
 import type {
+  AlertClipDto,
   AlertDto,
+  AnalysisDto,
   CabinDto,
   GuardianDto,
+  HistoryRideDto,
+  LiveFrameDto,
   NoticeDto,
   RideDto,
+  VideoSessionDto,
 } from "@/services/api/types";
 import type {
+  AlertClip,
+  AnalysisSide,
   Coordinate,
   DriverState,
   Guardian,
   GuardianNotice,
+  HistoryRide,
+  LiveFrame,
+  MediaChannel,
+  RideAnalysis,
   SafetyAlert,
   SafetyStatus,
   Seat,
+  VideoSession,
 } from "@/types/domain";
 
 const DRIVER_STATES: DriverState[] = ["attentive", "drowsy", "distracted", "unavailable"];
@@ -90,6 +103,10 @@ export function normalizeRide(raw: Partial<RideDto> | null | undefined): RideDto
       : null,
     seats: normalizeSeats(raw.seats),
     updatedAt: asString(raw.updatedAt),
+    publisherOnline: asBoolean(raw.publisherOnline, false),
+    status: raw.status === "ended" ? "ended" : "active",
+    startedAt: asNumber(raw.startedAt),
+    endedAt: asNumber(raw.endedAt),
   };
 }
 
@@ -98,6 +115,7 @@ export function normalizeAlert(raw: Partial<AlertDto> | null | undefined): Safet
   const id = asString(raw.id);
   if (!id) return null;
   const coordinate = normalizeCoordinate(raw.coordinate);
+  const channel = raw.channel === "cms" || raw.channel === "dms" ? raw.channel : undefined;
   return {
     id,
     tripId: asString(raw.tripId),
@@ -111,6 +129,10 @@ export function normalizeAlert(raw: Partial<AlertDto> | null | undefined): Safet
     acknowledged: asBoolean(raw.acknowledged, false),
     evidenceId: raw.evidenceId ? asString(raw.evidenceId) : undefined,
     origin: (raw.origin as SafetyAlert["origin"]) || "vehicle",
+    channel,
+    orinType: raw.orinType ? asString(raw.orinType) : undefined,
+    confidence: asNumber(raw.confidence),
+    clipId: raw.clipId ? asString(raw.clipId) : null,
   };
 }
 
@@ -172,5 +194,113 @@ export function normalizeCabin(raw: Partial<CabinDto> | null | undefined): Cabin
     driverState: normalizeDriverState(raw.driverState),
     seats: normalizeSeats(raw.seats),
     safetyStatus: normalizeSafetyStatus(raw.safetyStatus),
+  };
+}
+
+export function normalizeHistoryRide(raw: Partial<HistoryRideDto> | null | undefined): HistoryRide | null {
+  if (!raw || typeof raw !== "object") return null;
+  const id = asString(raw.id);
+  if (!id) return null;
+  return {
+    id,
+    deviceId: asString(raw.deviceId),
+    passenger: asString(raw.passenger),
+    status: raw.status === "ended" ? "ended" : "active",
+    startedAt: asNumber(raw.startedAt),
+    endedAt: asNumber(raw.endedAt),
+    safetyStatus: normalizeSafetyStatus(raw.safetyStatus),
+    score: asNumber(raw.score, 0) ?? 0,
+    alertCount: asNumber(raw.alertCount, 0) ?? 0,
+  };
+}
+
+export function normalizeHistoryRides(raw: unknown): HistoryRide[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => normalizeHistoryRide(item as HistoryRideDto))
+    .filter((ride): ride is HistoryRide => Boolean(ride));
+}
+
+function normalizeAnalysisSide(raw: unknown): AnalysisSide | null {
+  if (!raw || typeof raw !== "object") return null;
+  const side = raw as Partial<AnalysisSide>;
+  return {
+    scene: asString(side.scene),
+    hazards: Array.isArray(side.hazards) ? side.hazards.map((item) => String(item)) : [],
+    confidence: asNumber(side.confidence, 0) ?? 0,
+    suppressed: Array.isArray(side.suppressed) ? side.suppressed.map((item) => String(item)) : [],
+    observations:
+      side.observations && typeof side.observations === "object"
+        ? (side.observations as Record<string, unknown>)
+        : {},
+    at: asNumber(side.at, Date.now()) ?? Date.now(),
+  };
+}
+
+export function normalizeAnalysis(raw: Partial<AnalysisDto> | null | undefined): RideAnalysis | null {
+  if (!raw || typeof raw !== "object") return null;
+  return {
+    deviceId: asString(raw.deviceId),
+    updatedAt: asNumber(raw.updatedAt, Date.now()) ?? Date.now(),
+    dms: normalizeAnalysisSide(raw.dms),
+    cms: normalizeAnalysisSide(raw.cms),
+  };
+}
+
+export function normalizeLiveFrame(raw: Partial<LiveFrameDto> | null | undefined): LiveFrame | null {
+  if (!raw || typeof raw !== "object") return null;
+  const channel = raw.channel === "cms" ? "cms" : raw.channel === "dms" ? "dms" : null;
+  if (!channel) return null;
+  const path = asString(raw.url);
+  if (!path) return null;
+  const at = asNumber(raw.at, Date.now()) ?? Date.now();
+  return {
+    rideId: asString(raw.rideId),
+    channel,
+    at,
+    imageUrl: absoluteMediaUrl(path),
+  };
+}
+
+export function normalizeVideoSession(raw: Partial<VideoSessionDto> | null | undefined): VideoSession | null {
+  if (!raw || typeof raw !== "object") return null;
+  const url = asString(raw.url);
+  const token = asString(raw.token);
+  if (!url) return null;
+  return {
+    url,
+    mode: raw.mode === "dummy" ? "dummy" : "livekit",
+    token,
+    room: asString(raw.room),
+    tracks: Array.isArray(raw.tracks) ? raw.tracks.map((item) => String(item)) : [],
+    expiresAt: asNumber(raw.expiresAt, 0) ?? 0,
+    publisherOnline: asBoolean(raw.publisherOnline, false),
+    previewUrl: absoluteMediaUrl(asString(raw.preview)),
+  };
+}
+
+export function normalizeAlertClip(raw: Partial<AlertClipDto> | null | undefined): AlertClip | null {
+  if (!raw || typeof raw !== "object") return null;
+  const id = asString(raw.id);
+  if (!id) return null;
+  const channel: MediaChannel = raw.channel === "cms" ? "cms" : "dms";
+  return {
+    id,
+    rideId: asString(raw.rideId),
+    alertId: asString(raw.alertId),
+    channel,
+    startAt: asNumber(raw.startAt, 0) ?? 0,
+    endAt: asNumber(raw.endAt, 0) ?? 0,
+    frames: Array.isArray(raw.frames)
+      ? raw.frames
+          .map((frame) => {
+            const at = asNumber(frame?.at, 0) ?? 0;
+            const path = asString(frame?.url);
+            if (!path) return null;
+            return { at, imageUrl: absoluteMediaUrl(path) };
+          })
+          .filter((frame): frame is { at: number; imageUrl: string } => Boolean(frame))
+      : [],
+    videoUrl: raw.videoUrl ? absoluteMediaUrl(asString(raw.videoUrl)) : null,
   };
 }

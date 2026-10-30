@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { Page } from "@/components/layout/Page";
+import { LiveStill } from "@/components/media/LiveStill";
+import { AnalysisPanel } from "@/components/safety/AnalysisPanel";
 import { SeatOccupancyGrid } from "@/components/safety/SeatOccupancyGrid";
 import { ApiStatusBanner } from "@/components/system/ApiStatusBanner";
 import { StatusChip } from "@/components/system/StatusChip";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { ScreenState } from "@/components/ui/ScreenState";
+import { Segmented } from "@/components/ui/Segmented";
 import { driverStateLabel } from "@/constants/liveMap";
 import { useLiveApiRefresh } from "@/hooks/useLiveApiRefresh";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -15,6 +18,7 @@ import { services } from "@/services/createServices";
 import { useRideStore, useSafetyIndex } from "@/stores/useRideStore";
 
 type Phase = "idle" | "loading" | "live" | "error";
+type CameraTab = "both" | "cms" | "dms";
 
 export function CabinScreen() {
   useLiveApiRefresh("cabin");
@@ -28,19 +32,26 @@ export function CabinScreen() {
   const passengerName = useRideStore((state) => state.passengerName);
   const deviceId = useRideStore((state) => state.deviceId);
   const deviceState = useRideStore((state) => state.deviceState);
+  const publisherOnline = useRideStore((state) => state.publisherOnline);
+  const score = useRideStore((state) => state.score);
   const rideId = useRideStore((state) => state.rideId);
+  const analysis = useRideStore((state) => state.analysis);
+  const frameDms = useRideStore((state) => state.frameDms);
+  const frameCms = useRideStore((state) => state.frameCms);
+  const videoSession = useRideStore((state) => state.videoSession);
   const liveMode = useRideStore((state) => state.liveMode);
   const refreshing = useRideStore((state) => state.refreshing);
   const refreshCabin = useRideStore((state) => state.refreshCabin);
+  const refreshFrames = useRideStore((state) => state.refreshFrames);
+  const refreshAnalysis = useRideStore((state) => state.refreshAnalysis);
+  const refreshVideo = useRideStore((state) => state.refreshVideo);
   const refreshAll = useRideStore((state) => state.refreshAll);
   const askSos = useRideStore((state) => state.askSos);
-  const startCall = useRideStore((state) => state.startCall);
   const safety = useSafetyIndex();
   const { colors } = useTheme();
   const [phase, setPhase] = useState<Phase>("idle");
   const [note, setNote] = useState("");
-  const [recording, setRecording] = useState(false);
-  const [seconds, setSeconds] = useState(0);
+  const [camera, setCamera] = useState<CameraTab>("both");
 
   useEffect(() => {
     if (!consent) {
@@ -52,8 +63,16 @@ export function CabinScreen() {
     const timer = setTimeout(() => {
       void (async () => {
         try {
-          if (liveMode) await refreshCabin();
-          await services.cabin.open({ camera: "cabin", fault });
+          if (liveMode) {
+            await Promise.all([
+              refreshCabin(),
+              refreshFrames(),
+              refreshAnalysis(),
+              refreshVideo().catch(() => undefined),
+            ]);
+          } else {
+            await services.cabin.open({ camera: "cabin", fault });
+          }
           if (!alive) return;
           setPhase("live");
         } catch (error) {
@@ -62,20 +81,23 @@ export function CabinScreen() {
           setPhase("error");
         }
       })();
-    }, liveMode ? 200 : 800);
+    }, liveMode ? 120 : 800);
     return () => {
       alive = false;
       clearTimeout(timer);
     };
-  }, [consent, fault, liveMode, refreshCabin]);
+  }, [consent, fault, liveMode, refreshAnalysis, refreshCabin, refreshFrames, refreshVideo]);
 
   useEffect(() => {
-    if (!recording) return;
-    const timer = setInterval(() => setSeconds((value) => value + 1), 1000);
-    return () => clearInterval(timer);
-  }, [recording]);
+    if (!liveMode || !consent || phase !== "live") return;
+    const id = setInterval(() => {
+      void Promise.all([refreshFrames(), refreshAnalysis().catch(() => undefined)]);
+    }, 4000);
+    return () => clearInterval(id);
+  }, [consent, liveMode, phase, refreshAnalysis, refreshFrames]);
 
   const attentive = driverState === "attentive";
+  const deviceOnline = (deviceState || "").toLowerCase() === "online";
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -89,21 +111,27 @@ export function CabinScreen() {
           borderColor: colors.line,
         },
         chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-        row: { flexDirection: "row", alignItems: "center", gap: 10 },
-        flex: { flex: 1 },
+        dual: { gap: 12 },
         section: { marginTop: 4, gap: 10 },
-        actions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-        action: { flexGrow: 1, minWidth: 96 },
       }),
     [colors],
   );
+
+  const onRefresh = () => {
+    void Promise.all([
+      refreshCabin(),
+      refreshFrames(),
+      refreshAnalysis(),
+      refreshVideo().catch(() => undefined),
+    ]);
+  };
 
   return (
     <Page
       title="Cabin"
       subtitle={liveMode ? `${passengerName || rideId} · ${deviceId}` : "Interior view for this ride"}
       refreshing={refreshing}
-      onRefresh={liveMode ? () => void refreshCabin() : undefined}
+      onRefresh={liveMode ? onRefresh : undefined}
     >
       <View style={{ marginBottom: 10 }}>
         <ApiStatusBanner onRetry={() => void refreshAll()} />
@@ -113,7 +141,7 @@ export function CabinScreen() {
         <ScreenState
           kind="denied"
           title="Cabin monitoring is off"
-          body="Turn this on to view driver and seat state for the current ride."
+          body="Turn this on to view driver/cabin stills and analysis for the current ride."
           actionLabel="Allow cabin monitoring"
           onAction={() => setConsent(true)}
         />
@@ -129,7 +157,7 @@ export function CabinScreen() {
           actionLabel="Retry"
           onAction={() => {
             setFault(false);
-            if (liveMode) void refreshCabin();
+            if (liveMode) onRefresh();
           }}
         />
       ) : null}
@@ -140,57 +168,72 @@ export function CabinScreen() {
             <AppText variant="title" style={{ fontSize: 24 }}>
               {driverStateLabel(driverState)}
             </AppText>
-            <AppText variant="body">
-              {liveMode
-                ? "Driver and occupancy come from the cabin API. No camera stream URL is published yet."
-                : "Simulated cabin preview on this phone."}
-            </AppText>
             <View style={styles.chips}>
               <StatusChip
                 label={safetyStatus}
                 tone={safetyStatus === "emergency" ? "danger" : safetyStatus === "caution" ? "warn" : "ok"}
               />
+              <StatusChip label={driverState} tone={attentive ? "ok" : "danger"} />
+              <StatusChip label={deviceOnline ? "device online" : "device offline"} tone={deviceOnline ? "ok" : "warn"} />
               <StatusChip
-                label={driverState}
-                tone={attentive ? "ok" : "danger"}
+                label={publisherOnline ? "camera online" : "camera offline"}
+                tone={publisherOnline ? "ok" : "warn"}
               />
-              <StatusChip
-                label={deviceState || "device"}
-                tone={(deviceState || "").toLowerCase() === "online" ? "ok" : "warn"}
-              />
+              <StatusChip label={`score ${score}`} tone={score >= 80 ? "ok" : score >= 50 ? "warn" : "danger"} />
             </View>
             <AppText variant="caption">{safety.line}</AppText>
+            {videoSession ? (
+              <AppText variant="caption">
+                Watch · {videoSession.mode} · room {videoSession.room || rideId}
+                {videoSession.tracks.length ? ` · ${videoSession.tracks.join(", ")}` : ""}
+                {videoSession.publisherOnline
+                  ? " · LiveKit token ready (native client for moving video)"
+                  : " · JPEG stills until publisher comes online"}
+              </AppText>
+            ) : null}
           </View>
+
+          {liveMode ? (
+            <>
+              <Segmented
+                value={camera}
+                onChange={(id) => setCamera(id as CameraTab)}
+                items={[
+                  { id: "both", label: "Both" },
+                  { id: "dms", label: "Driver" },
+                  { id: "cms", label: "Cabin" },
+                ]}
+              />
+
+              {camera === "both" ? (
+                <View style={styles.dual}>
+                  <LiveStill frame={frameDms} label="DMS · driver" height={200} />
+                  <LiveStill frame={frameCms} label="CMS · cabin" height={200} />
+                </View>
+              ) : (
+                <LiveStill
+                  frame={camera === "cms" ? frameCms : frameDms}
+                  label={camera === "cms" ? "CMS · cabin" : "DMS · driver"}
+                  height={260}
+                />
+              )}
+
+              {(camera === "both" || camera === "dms") && (
+                <AnalysisPanel title="Driver analysis (DMS)" side={analysis?.dms} />
+              )}
+              {(camera === "both" || camera === "cms") && (
+                <AnalysisPanel title="Cabin analysis (CMS)" side={analysis?.cms} />
+              )}
+            </>
+          ) : (
+            <ScreenState kind="empty" title="Simulated cabin" body="Connect EXPO_PUBLIC_TELEMETRY_URL for live stills." />
+          )}
 
           <View style={styles.section}>
             <AppText variant="strong">Seat occupancy</AppText>
             <SeatOccupancyGrid seats={seats} awaitingWhenEmpty={liveMode} />
-            {liveMode && seats.length === 0 ? (
-              <AppText variant="caption">The cabin API returned an empty seats list for this ride.</AppText>
-            ) : null}
           </View>
 
-          <View style={styles.actions}>
-            {!liveMode ? (
-              <View style={styles.action}>
-                <Button
-                  label={recording ? "Stop" : "Record"}
-                  tone={recording ? "danger" : "quiet"}
-                  onPress={() => {
-                    setRecording((value) => !value);
-                    if (recording) setSeconds(0);
-                  }}
-                />
-              </View>
-            ) : null}
-            <View style={styles.action}>
-              <Button label="Video call" tone="ghost" onPress={() => startCall("video")} />
-            </View>
-            <View style={styles.action}>
-              <Button label="Audio call" tone="ghost" onPress={() => startCall("audio")} />
-            </View>
-          </View>
-          {!liveMode ? <Button label="Interrupt feed" tone="quiet" onPress={() => setFault(true)} /> : null}
           <Button label="Raise SOS" tone="danger" onPress={askSos} />
         </View>
       ) : null}

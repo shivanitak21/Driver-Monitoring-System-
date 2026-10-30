@@ -114,3 +114,12 @@ export function Video(props: IconProps) {
     </Svg>
   );
 }
+
+export function X(props: IconProps) {
+  return (
+    <Svg {...frame(props)}>
+      <Path d="M18 6 6 18" />
+      <Path d="m6 6 12 12" />
+    </Svg>
+  );
+}
