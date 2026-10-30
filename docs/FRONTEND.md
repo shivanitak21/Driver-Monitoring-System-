@@ -36,10 +36,10 @@ Do not put these in the app: `MEDIA_DEVICE_KEY`, `LIVEKIT_API_SECRET`, MQTT pass
 | Map | `POST /v1/rides/{rideId}/telemetry` |
 | Alerts | `GET /v1/rides/{rideId}/alerts`, then socket `alert` / `sos`. Ack with `POST /v1/alerts/{alertId}/ack` |
 | VLM text | `GET /v1/rides/{rideId}/analysis?channel=dms` or `cms`, then socket `analysis` |
-| Live still | `GET /v1/rides/{rideId}/frames/live?channel=dms` or `cms` |
-| Live video | `GET /v1/rides/{rideId}/video`, then connect LiveKit with `url` + `token` |
+| Live still | `GET /v1/rides/{rideId}/frames/live?channel=dms` or `cms`, then load `url` |
+| Live video | `GET /v1/rides/{rideId}/video` starts it. `POST /v1/rides/{rideId}/video/cancel` stops it |
 | Past trips | `GET /v1/history?deviceId=orin-nano-01` |
-| Alert clip | `GET /v1/rides/{rideId}/clips/{clipId}` |
+| Alert clip | `alerts[].clipId` from `GET /v1/rides/{rideId}/alerts`, then `GET /v1/rides/{rideId}/clips/{clipId}` |
 | SOS | `POST /v1/rides/{rideId}/sos` |
 | Cabin seats | `GET /v1/rides/{rideId}/cabin` |
 | Guardians | list, `POST` to add, `POST .../sharing` to toggle |
@@ -170,7 +170,7 @@ Open one trip with `GET /v1/rides/{id}` and `GET /v1/rides/{id}/alerts`. This li
 | `channel` | `dms` or `cms` |
 | `severity` | `info`, `low`, `medium`, `high`, `critical` |
 | `origin` | `vehicle` or `device` (phone SOS) |
-| `clipId` | clip to play, or `null` when this alert has no video |
+| `clipId` | id of the alert clip, or `null`. This is the only place the app reads the clip id |
 
 `POST /v1/alerts/{alertId}/ack` with no body. Returns the same alert with `acknowledged: true`. `404` if missing.
 
@@ -242,43 +242,57 @@ One current JPEG per channel, with the capture time.
 }
 ```
 
-Load the picture from `{BASE}` + `url`. `404` until the first frame. `403` when sharing is off. If `at` is more than about 15 seconds old, show the still as stale.
+Load the picture from `{BASE}` + `url`. That URL is `GET /v1/rides/{rideId}/frames/live/image?channel=dms` (or `cms`) and the body is the JPEG, not JSON. `404` until the first frame. `403` when sharing is off. If `at` is more than about 15 seconds old, show the still as stale.
 
-`dms` is the driver camera. `cms` is the cabin camera.
+`dms` is the driver camera. `cms` is the cabin camera. This is the live still only. It is not the Watch stream and not the alert clip.
 
 ---
 
 ## Live video
 
-The Jetson is already publishing into LiveKit. The app does not call the car. It asks this API for a watch token.
+Watch is one cabin stream: driver and passenger stitched into one picture, plus the cabin microphone. The app does not call the car. `GET /video` tells the car to start. `POST /video/cancel` tells it to stop. The stream stays up until that cancel. It does not expire on its own.
 
 `GET /v1/rides/{rideId}/video?track=all`
 
-`track` may be `all` (default), `driver`, or `cabin`.
+`track` may be `all` (default), `driver`, or `cabin`. It only filters the `tracks` list in this JSON. The published picture is still the one cabin view.
 
 ```json
 {
-  "url": "ws://YOUR_VPS_IP:7880",
+  "url": "wss://YOUR_VPS_IP:7880",
   "mode": "livekit",
   "token": "<viewer jwt>",
   "room": "ride-1842",
   "tracks": ["driver", "cabin"],
   "expiresAt": 1761560900000,
   "publisherOnline": true,
+  "publish": true,
   "preview": "/v1/rides/ride-1842/video/preview"
 }
 ```
 
+| Field | Meaning |
+|---|---|
+| `publish` | `true` after this call. The car sends media until cancel. |
+| `token` | Viewer token. It cannot publish. Refresh by calling `GET /video` again before `expiresAt`. That call does not stop the stream. |
+| `publisherOnline` | `true` when a frame arrived in the last minute. `false` means show "vehicle camera offline". |
+
 | `mode` | What to do |
 |---|---|
-| `livekit` | Connect a LiveKit client to `url` with `token`. Subscribe to tracks `driver` and `cabin`. The token cannot publish. Refresh by calling `GET /video` again before `expiresAt`. |
-| `dummy` | There is no moving stream. Show the JPEG from `{BASE}{preview}?track=driver` or `track=cabin`. |
+| `livekit` | Connect a LiveKit client to `url` with `token`. Subscribe to one video track and one audio track, both named `cabin`. |
+| `local` | No LiveKit server. `GET /v1/rides/{rideId}/video/live` returns the latest sample as JSON (`width`, `height`, `samples`, `rate`, `image_b64`, `audio_b64`, `seq`). This is for a local test, not the production player. |
+| `dummy` | No moving stream. `publish` is `false`. Show the JPEG from `{BASE}{preview}?track=driver` or `track=cabin`. |
 
-`403` when sharing is off. `publisherOnline: false` means the vehicle has not sent video recently. Show "vehicle camera offline" instead of a black room.
+`403` when sharing is off.
 
-This is watch, not a phone call. There is no answer or reject request.
+`POST /v1/rides/{rideId}/video/cancel` has no body.
 
-`GET /v1/rides/{rideId}/video/preview?track=driver` returns a JPEG body (`track` is `driver` or `cabin` on this route). Prefer `frames/live` for stills. Prefer LiveKit when `mode` is `livekit`.
+```json
+{ "ok": true, "publish": false, "room": "ride-1842" }
+```
+
+`404` if the ride does not exist. The next time the car asks for a token it stops sending the stream. The live stills keep updating.
+
+`GET /v1/rides/{rideId}/video/preview?track=driver` returns a JPEG body (`track` is `driver` or `cabin`). That JPEG is the Watch fallback. The trip still is `frames/live`. The moving stream is LiveKit when `mode` is `livekit`.
 
 ---
 
@@ -302,11 +316,11 @@ When `alert.clipId` is set:
     { "at": 1761561196000, "url": "/v1/media/clip-abc123/0.jpg" },
     { "at": 1761561200000, "url": "/v1/media/clip-abc123/1.jpg" }
   ],
-  "videoUrl": null
+  "videoUrl": "/v1/media/clip-abc123/clip.mp4"
 }
 ```
 
-Show the frames in `at` order. Image URL is `{BASE}` + `frames[i].url`. `channel` `dms` is the driver clip. `cms` is the cabin clip. `videoUrl` is `null` until a single MP4 is stored. `403` when sharing is off. `404` when that clip is not on this ride.
+Play `{BASE}` + `videoUrl` (`GET /v1/media/{clipId}/clip.mp4`). The body is `video/mp4`, about 8 seconds: 4 seconds before the alert and 4 seconds after. That file is what the guardian watches for this alert on this trip. `frames` are the same moment as stills. `channel` `dms` is the driver camera. `cms` is the cabin camera. `videoUrl` is `null` only when the car could not encode the file. `403` when sharing is off. `404` when that clip is not on this ride. `clipId` null means this alert has no clip yet.
 
 ---
 
@@ -491,4 +505,5 @@ These are for the Jetson. They require `MEDIA_DEVICE_KEY`, which the phone must 
 
 - `POST /v1/devices/{deviceId}/media-token`
 - `POST /v1/devices/{deviceId}/video/frame`
+- `POST /v1/devices/{deviceId}/video/live`
 - `POST /v1/devices/{deviceId}/clips`

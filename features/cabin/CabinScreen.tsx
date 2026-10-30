@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { Page } from "@/components/layout/Page";
+import { CabinMediaBar } from "@/components/media/CabinMediaBar";
 import { LiveStill } from "@/components/media/LiveStill";
 import { AnalysisPanel } from "@/components/safety/AnalysisPanel";
 import { SeatOccupancyGrid } from "@/components/safety/SeatOccupancyGrid";
@@ -15,7 +16,8 @@ import { driverStateLabel } from "@/constants/liveMap";
 import { useLiveApiRefresh } from "@/hooks/useLiveApiRefresh";
 import { useTheme } from "@/providers/ThemeProvider";
 import { services } from "@/services/createServices";
-import { useRideStore, useSafetyIndex } from "@/stores/useRideStore";
+import { useRideStore } from "@/stores/useRideStore";
+import type { MediaChannel } from "@/types/domain";
 
 type Phase = "idle" | "loading" | "live" | "error";
 type CameraTab = "both" | "cms" | "dms";
@@ -38,16 +40,13 @@ export function CabinScreen() {
   const analysis = useRideStore((state) => state.analysis);
   const frameDms = useRideStore((state) => state.frameDms);
   const frameCms = useRideStore((state) => state.frameCms);
-  const videoSession = useRideStore((state) => state.videoSession);
   const liveMode = useRideStore((state) => state.liveMode);
   const refreshing = useRideStore((state) => state.refreshing);
   const refreshCabin = useRideStore((state) => state.refreshCabin);
   const refreshFrames = useRideStore((state) => state.refreshFrames);
   const refreshAnalysis = useRideStore((state) => state.refreshAnalysis);
-  const refreshVideo = useRideStore((state) => state.refreshVideo);
   const refreshAll = useRideStore((state) => state.refreshAll);
   const askSos = useRideStore((state) => state.askSos);
-  const safety = useSafetyIndex();
   const { colors } = useTheme();
   const [phase, setPhase] = useState<Phase>("idle");
   const [note, setNote] = useState("");
@@ -64,12 +63,7 @@ export function CabinScreen() {
       void (async () => {
         try {
           if (liveMode) {
-            await Promise.all([
-              refreshCabin(),
-              refreshFrames(),
-              refreshAnalysis(),
-              refreshVideo().catch(() => undefined),
-            ]);
+            await Promise.all([refreshCabin(), refreshFrames(), refreshAnalysis()]);
           } else {
             await services.cabin.open({ camera: "cabin", fault });
           }
@@ -86,7 +80,7 @@ export function CabinScreen() {
       alive = false;
       clearTimeout(timer);
     };
-  }, [consent, fault, liveMode, refreshAnalysis, refreshCabin, refreshFrames, refreshVideo]);
+  }, [consent, fault, liveMode, refreshAnalysis, refreshCabin, refreshFrames]);
 
   useEffect(() => {
     if (!liveMode || !consent || phase !== "live") return;
@@ -98,38 +92,26 @@ export function CabinScreen() {
 
   const attentive = driverState === "attentive";
   const deviceOnline = (deviceState || "").toLowerCase() === "online";
+  const snapChannel: MediaChannel = camera === "cms" ? "cms" : "dms";
   const styles = useMemo(
     () =>
       StyleSheet.create({
         stack: { gap: 14 },
-        hero: {
-          borderRadius: 22,
-          padding: 18,
-          gap: 12,
-          backgroundColor: colors.bgRaised,
-          borderWidth: 1,
-          borderColor: colors.line,
-        },
         chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
         dual: { gap: 12 },
-        section: { marginTop: 4, gap: 10 },
+        section: { gap: 10 },
       }),
-    [colors],
+    [],
   );
 
   const onRefresh = () => {
-    void Promise.all([
-      refreshCabin(),
-      refreshFrames(),
-      refreshAnalysis(),
-      refreshVideo().catch(() => undefined),
-    ]);
+    void Promise.all([refreshCabin(), refreshFrames(), refreshAnalysis()]);
   };
 
   return (
     <Page
       title="Cabin"
-      subtitle={liveMode ? `${passengerName || rideId} · ${deviceId}` : "Interior view for this ride"}
+      subtitle={liveMode ? `${passengerName || rideId} · ${deviceId}` : "Interior view"}
       refreshing={refreshing}
       onRefresh={liveMode ? onRefresh : undefined}
     >
@@ -141,18 +123,18 @@ export function CabinScreen() {
         <ScreenState
           kind="denied"
           title="Cabin monitoring is off"
-          body="Turn this on to view driver/cabin stills and analysis for the current ride."
-          actionLabel="Allow cabin monitoring"
+          body="Allow cabin monitoring to see driver and cabin cameras."
+          actionLabel="Allow"
           onAction={() => setConsent(true)}
         />
       ) : null}
 
-      {consent && phase === "loading" ? <ScreenState kind="loading" title="Loading cabin status" /> : null}
+      {consent && phase === "loading" ? <ScreenState kind="loading" title="Loading cabin" /> : null}
 
       {consent && phase === "error" ? (
         <ScreenState
           kind="error"
-          title="Cabin status failed"
+          title="Cabin failed"
           body={note}
           actionLabel="Retry"
           onAction={() => {
@@ -164,37 +146,21 @@ export function CabinScreen() {
 
       {consent && phase === "live" ? (
         <View style={styles.stack}>
-          <View style={styles.hero}>
-            <AppText variant="title" style={{ fontSize: 24 }}>
-              {driverStateLabel(driverState)}
-            </AppText>
-            <View style={styles.chips}>
-              <StatusChip
-                label={safetyStatus}
-                tone={safetyStatus === "emergency" ? "danger" : safetyStatus === "caution" ? "warn" : "ok"}
-              />
-              <StatusChip label={driverState} tone={attentive ? "ok" : "danger"} />
-              <StatusChip label={deviceOnline ? "device online" : "device offline"} tone={deviceOnline ? "ok" : "warn"} />
-              <StatusChip
-                label={publisherOnline ? "camera online" : "camera offline"}
-                tone={publisherOnline ? "ok" : "warn"}
-              />
-              <StatusChip label={`score ${score}`} tone={score >= 80 ? "ok" : score >= 50 ? "warn" : "danger"} />
-            </View>
-            <AppText variant="caption">{safety.line}</AppText>
-            {videoSession ? (
-              <AppText variant="caption">
-                Watch · {videoSession.mode} · room {videoSession.room || rideId}
-                {videoSession.tracks.length ? ` · ${videoSession.tracks.join(", ")}` : ""}
-                {videoSession.publisherOnline
-                  ? " · LiveKit token ready (native client for moving video)"
-                  : " · JPEG stills until publisher comes online"}
-              </AppText>
-            ) : null}
+          <View style={styles.chips}>
+            <StatusChip
+              label={safetyStatus}
+              tone={safetyStatus === "emergency" ? "danger" : safetyStatus === "caution" ? "warn" : "ok"}
+            />
+            <StatusChip label={driverStateLabel(driverState)} tone={attentive ? "ok" : "danger"} />
+            <StatusChip label={deviceOnline ? "online" : "offline"} tone={deviceOnline ? "ok" : "warn"} />
+            <StatusChip label={publisherOnline ? "cam on" : "cam off"} tone={publisherOnline ? "ok" : "warn"} />
+            <StatusChip label={`${score}`} tone={score >= 80 ? "ok" : score >= 50 ? "warn" : "danger"} />
           </View>
 
           {liveMode ? (
             <>
+              <CabinMediaBar channel={snapChannel} />
+
               <Segmented
                 value={camera}
                 onChange={(id) => setCamera(id as CameraTab)}
@@ -207,30 +173,30 @@ export function CabinScreen() {
 
               {camera === "both" ? (
                 <View style={styles.dual}>
-                  <LiveStill frame={frameDms} label="DMS · driver" height={200} />
-                  <LiveStill frame={frameCms} label="CMS · cabin" height={200} />
+                  <LiveStill frame={frameDms} label="Driver" height={200} />
+                  <LiveStill frame={frameCms} label="Cabin" height={200} />
                 </View>
               ) : (
                 <LiveStill
                   frame={camera === "cms" ? frameCms : frameDms}
-                  label={camera === "cms" ? "CMS · cabin" : "DMS · driver"}
+                  label={camera === "cms" ? "Cabin" : "Driver"}
                   height={260}
                 />
               )}
 
               {(camera === "both" || camera === "dms") && (
-                <AnalysisPanel title="Driver analysis (DMS)" side={analysis?.dms} />
+                <AnalysisPanel title="Driver" side={analysis?.dms} />
               )}
               {(camera === "both" || camera === "cms") && (
-                <AnalysisPanel title="Cabin analysis (CMS)" side={analysis?.cms} />
+                <AnalysisPanel title="Cabin" side={analysis?.cms} />
               )}
             </>
           ) : (
-            <ScreenState kind="empty" title="Simulated cabin" body="Connect EXPO_PUBLIC_TELEMETRY_URL for live stills." />
+            <ScreenState kind="empty" title="Offline demo" body="Set EXPO_PUBLIC_TELEMETRY_URL for live cabin." />
           )}
 
           <View style={styles.section}>
-            <AppText variant="strong">Seat occupancy</AppText>
+            <AppText variant="strong">Seats</AppText>
             <SeatOccupancyGrid seats={seats} awaitingWhenEmpty={liveMode} />
           </View>
 

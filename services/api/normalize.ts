@@ -266,16 +266,29 @@ export function normalizeVideoSession(raw: Partial<VideoSessionDto> | null | und
   if (!raw || typeof raw !== "object") return null;
   const url = asString(raw.url);
   const token = asString(raw.token);
-  if (!url) return null;
+  // livekit needs url+token; local/dummy may omit one of them
+  if (raw.mode === "livekit" && (!url || !token)) return null;
+  if (raw.mode !== "local" && raw.mode !== "dummy" && !url) return null;
+  const mode = raw.mode === "dummy" ? "dummy" : raw.mode === "local" ? "local" : "livekit";
   return {
     url,
-    mode: raw.mode === "dummy" ? "dummy" : "livekit",
+    mode,
     token,
     room: asString(raw.room),
     tracks: Array.isArray(raw.tracks) ? raw.tracks.map((item) => String(item)) : [],
     expiresAt: asNumber(raw.expiresAt, 0) ?? 0,
     publisherOnline: asBoolean(raw.publisherOnline, false),
+    publish: asBoolean(raw.publish, mode !== "dummy"),
     previewUrl: absoluteMediaUrl(asString(raw.preview)),
+  };
+}
+
+export function normalizeVideoCancel(raw: Partial<{ ok: boolean; publish: boolean; room: string }> | null | undefined) {
+  if (!raw || typeof raw !== "object") return null;
+  return {
+    ok: asBoolean(raw.ok, true),
+    publish: asBoolean(raw.publish, false),
+    room: asString(raw.room),
   };
 }
 

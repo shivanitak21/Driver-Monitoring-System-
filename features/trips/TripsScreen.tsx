@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 
-import { AlertTimelineItem } from "@/components/alerts/AlertTimelineItem";
 import { Page } from "@/components/layout/Page";
 import { RideMap } from "@/components/map/RideMap";
 import { TripHistoryCard } from "@/components/trips/TripHistoryCard";
@@ -10,16 +9,13 @@ import { ApiStatusBanner } from "@/components/system/ApiStatusBanner";
 import { StatusChip } from "@/components/system/StatusChip";
 import { AppText } from "@/components/ui/AppText";
 import { ScreenState } from "@/components/ui/ScreenState";
-import { Segmented } from "@/components/ui/Segmented";
 import { clock, timeAgo } from "@/constants/format";
-import { formatCoords, formatEta, formatSpeed, liveMapGeometry, rideStatusLabel } from "@/constants/liveMap";
+import { formatEta, formatSpeed, liveMapGeometry, rideStatusLabel } from "@/constants/liveMap";
 import { pastTrips } from "@/data/fleet";
 import { routeLine, shiftLine } from "@/data/route";
 import { useLiveApiRefresh } from "@/hooks/useLiveApiRefresh";
 import { useTheme } from "@/providers/ThemeProvider";
 import { tripHeadline, useRideStore, useSafetyIndex } from "@/stores/useRideStore";
-import { useState } from "react";
-import type { MediaChannel } from "@/types/domain";
 
 export function TripsScreen() {
   useLiveApiRefresh("all");
@@ -33,14 +29,11 @@ export function TripsScreen() {
   const deviceState = useRideStore((state) => state.deviceState);
   const publisherOnline = useRideStore((state) => state.publisherOnline);
   const safetyStatus = useRideStore((state) => state.safetyStatus);
-  const driverState = useRideStore((state) => state.driverState);
   const score = useRideStore((state) => state.score);
   const rideStatus = useRideStore((state) => state.rideStatus);
   const rideId = useRideStore((state) => state.rideId);
-  const shareLink = useRideStore((state) => state.shareLink);
   const history = useRideStore((state) => state.history);
   const alerts = useRideStore((state) => state.alerts);
-  const acknowledge = useRideStore((state) => state.acknowledge);
   const refreshing = useRideStore((state) => state.refreshing);
   const refreshAll = useRideStore((state) => state.refreshAll);
   const local = useRideStore((state) => Boolean(state.routeShift) && !state.liveMode);
@@ -55,18 +48,14 @@ export function TripsScreen() {
   const route = liveMode ? liveGeo.route : simulatedRoute;
   const mapTrail = liveMode ? liveGeo.trail : trail;
   const deviceOnline = (deviceState || "").toLowerCase() === "online";
-  const [eventChannel, setEventChannel] = useState<"all" | MediaChannel>("all");
-  const eventHistory = useMemo(() => {
-    const sorted = [...alerts].sort((a, b) => b.at - a.at);
-    if (eventChannel === "all") return sorted;
-    return sorted.filter((alert) => alert.channel === eventChannel);
-  }, [alerts, eventChannel]);
+  const openAlerts = useMemo(() => alerts.filter((alert) => !alert.acknowledged).length, [alerts]);
+  const latest = useMemo(() => [...alerts].sort((a, b) => b.at - a.at).slice(0, 3), [alerts]);
   const { colors } = useTheme();
 
   return (
     <Page
       title="Trips"
-      subtitle={liveMode ? `${rideId} · ${deviceId} · ${rideStatus}` : "This ride and the ones kept on the phone"}
+      subtitle={liveMode ? `${rideId} · ${rideStatus}` : "This ride and past trips"}
       refreshing={refreshing}
       onRefresh={liveMode ? () => void refreshAll() : undefined}
     >
@@ -87,62 +76,44 @@ export function TripsScreen() {
           onPan={() => undefined}
           onPressVehicle={() => router.push(`/trip/${rideId}`)}
         />
-        <View style={[styles.mapTag, { backgroundColor: colors.glass }]} pointerEvents="none">
-          <AppText variant="caption">{liveMode ? status : "Live"}</AppText>
-        </View>
       </View>
 
       {liveMode ? (
         <View style={styles.chips}>
           <StatusChip label={safetyStatus} tone={safetyStatus === "safe" ? "ok" : safetyStatus === "caution" ? "warn" : "danger"} />
-          <StatusChip label={driverState} tone={driverState === "attentive" ? "ok" : "danger"} />
-          <StatusChip label={deviceOnline ? "device online" : "device offline"} tone={deviceOnline ? "ok" : "warn"} />
-          <StatusChip label={publisherOnline ? "camera online" : "camera offline"} tone={publisherOnline ? "ok" : "warn"} />
-          <StatusChip label={`score ${score}`} tone={score >= 80 ? "ok" : score >= 50 ? "warn" : "danger"} />
-          <StatusChip label={shareLink ? "link ready" : "no link"} tone={shareLink ? "ok" : "muted"} />
+          <StatusChip label={deviceOnline ? "online" : "offline"} tone={deviceOnline ? "ok" : "warn"} />
+          <StatusChip label={publisherOnline ? "cam on" : "cam off"} tone={publisherOnline ? "ok" : "warn"} />
+          <StatusChip label={`${score}`} tone={score >= 80 ? "ok" : "warn"} />
         </View>
       ) : null}
 
       <View style={styles.metrics}>
         <Metric label="ETA" value={formatEta(eta)} />
         <Metric label="Speed" value={formatSpeed(speed)} />
-        <Metric label="Events" value={String(alerts.length)} />
+        <Metric label="Open" value={String(openAlerts)} />
       </View>
-
-      {liveMode ? (
-        <AppText variant="caption" style={{ marginBottom: 8 }}>
-          {formatCoords(position)} · heading {Math.round(heading)}°
-        </AppText>
-      ) : null}
 
       <TripHistoryCard
         testID="live-trip-card"
         title={liveMode ? passengerName || rideId : headline.to}
-        meta={liveMode ? `${rideId} · ${deviceId} · ${status}` : passengerName}
+        meta={liveMode ? `${deviceId} · ${status}` : passengerName}
         status={safety.status}
         onPress={() => router.push(`/trip/${rideId}`)}
       />
 
       {liveMode ? (
         history.length === 0 ? (
-          <ScreenState
-            kind="empty"
-            title="No ride history"
-            body="GET /v1/history?deviceId=… returned no rides for this device."
-          />
+          <ScreenState kind="empty" title="No past rides" body="History from the API will show here." />
         ) : (
           <>
-            <AppText variant="strong" style={{ marginTop: 18, marginBottom: 4 }}>
-              Ride history
-            </AppText>
-            <AppText variant="caption" style={{ marginBottom: 8 }}>
-              From GET /v1/history · {history.length} ride{history.length === 1 ? "" : "s"}
+            <AppText variant="strong" style={{ marginTop: 18, marginBottom: 8 }}>
+              Past rides
             </AppText>
             {history.map((trip) => (
               <TripHistoryCard
                 key={trip.id}
                 title={trip.passenger || trip.id}
-                meta={`${trip.id} · ${trip.status} · score ${trip.score} · ${trip.alertCount} alerts${trip.startedAt ? ` · ${clock(trip.startedAt)}` : ""}`}
+                meta={`${trip.status} · score ${trip.score} · ${trip.alertCount} alerts${trip.startedAt ? ` · ${clock(trip.startedAt)}` : ""}`}
                 status={trip.safetyStatus}
                 onPress={() => router.push(`/trip/${trip.id}`)}
               />
@@ -161,53 +132,24 @@ export function TripsScreen() {
         ))
       )}
 
-      {liveMode ? (
-        <View style={{ marginTop: 22 }}>
+      {liveMode && latest.length > 0 ? (
+        <View style={{ marginTop: 22, gap: 8 }}>
           <View style={styles.sectionHeader}>
-            <View style={{ flex: 1, gap: 2 }}>
-              <AppText variant="strong">Event history</AppText>
-              <AppText variant="caption">
-                From GET /v1/rides/…/alerts · {eventHistory.length}
-                {eventChannel === "all" ? ` of ${alerts.length}` : ""} shown
-              </AppText>
-            </View>
+            <AppText variant="strong">Latest alerts</AppText>
             <Pressable onPress={() => router.push("/alerts")} hitSlop={8}>
               <AppText variant="caption" style={{ color: colors.signal }}>
-                Alerts tab
+                See all
               </AppText>
             </Pressable>
           </View>
-
-          <View style={{ marginBottom: 12 }}>
-            <Segmented
-              value={eventChannel}
-              onChange={(id) => setEventChannel(id as "all" | MediaChannel)}
-              items={[
-                { id: "all", label: "All" },
-                { id: "dms", label: "Driver" },
-                { id: "cms", label: "Cabin" },
-              ]}
-            />
-          </View>
-
-          {eventHistory.length === 0 ? (
-            <ScreenState
-              kind="empty"
-              title="No events yet"
-              body="Vehicle alerts (drowsiness, distraction, cabin activity, SOS) appear here as event history."
-            />
-          ) : (
-            eventHistory.map((alert, index) => (
-              <AlertTimelineItem
-                key={alert.id}
-                alert={alert}
-                timeLabel={`${timeAgo(alert.at)} · ${clock(alert.at)}`}
-                showLine={index < eventHistory.length - 1}
-                onAcknowledge={() => void acknowledge(alert.id)}
-                onEvidence={() => router.push(`/evidence/${alert.id}`)}
-              />
-            ))
-          )}
+          {latest.map((alert) => (
+            <Pressable key={alert.id} onPress={() => router.push("/alerts")} style={styles.previewRow}>
+              <AppText variant="strong" numberOfLines={1}>
+                {alert.title}
+              </AppText>
+              <AppText variant="caption">{timeAgo(alert.at)}</AppText>
+            </Pressable>
+          ))}
         </View>
       ) : null}
     </Page>
@@ -227,18 +169,10 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   map: {
-    height: 220,
+    height: 200,
     borderRadius: 22,
     overflow: "hidden",
     borderWidth: 1,
-  },
-  mapTag: {
-    position: "absolute",
-    left: 12,
-    top: 12,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
   },
   chips: {
     flexDirection: "row",
@@ -252,15 +186,16 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
   },
-  metric: {
-    flex: 1,
-    gap: 2,
-  },
+  metric: { flex: 1, gap: 2 },
   sectionHeader: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 10,
+  },
+  previewRow: {
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(0,0,0,0.08)",
+    gap: 2,
   },
 });

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import { useLocalSearchParams } from "expo-router";
+import { WebView } from "react-native-webview";
 
 import { Page } from "@/components/layout/Page";
 import { AppText } from "@/components/ui/AppText";
@@ -54,6 +55,14 @@ export function EvidenceScreen() {
     };
   }, [alert, clipId, liveMode, rideId]);
 
+  const videoHtml = useMemo(() => {
+    if (!clip?.videoUrl) return "";
+    const src = clip.videoUrl.replace(/"/g, "&quot;");
+    return `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<style>html,body{margin:0;padding:0;background:#000;height:100%;}video{width:100%;height:100%;object-fit:contain;}</style></head>
+<body><video controls autoplay playsinline src="${src}"></video></body></html>`;
+  }, [clip?.videoUrl]);
+
   if (!alert) {
     return (
       <Page title="Missing evidence" back>
@@ -63,11 +72,7 @@ export function EvidenceScreen() {
   }
 
   return (
-    <Page
-      title={alert.title}
-      subtitle={`${clock(alert.at)} · ${alert.channel || alert.kind}`}
-      back
-    >
+    <Page title={alert.title} subtitle={`${clock(alert.at)} · ${alert.channel || alert.kind}`} back>
       <View style={[styles.card, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}>
         <AppText variant="strong">{alert.severity}</AppText>
         <AppText variant="body">{alert.detail}</AppText>
@@ -79,7 +84,7 @@ export function EvidenceScreen() {
           <AppText variant="caption">confidence {alert.confidence}</AppText>
         ) : null}
         <AppText variant="caption">
-          {clipId ? `clipId: ${clipId}` : "clipId: null (no stored clip yet)"}
+          {clipId ? `clipId: ${clipId}` : "clipId: null — this alert has no clip yet"}
         </AppText>
       </View>
 
@@ -89,13 +94,13 @@ export function EvidenceScreen() {
           title="No clip stored"
           body={
             liveMode
-              ? "This alert has no clipId. GET /clips only works when the API sets clipId on the alert."
+              ? "Read clipId only from the alert. GET /clips/{clipId} when that field is set."
               : "Evidence media is not bundled for this event."
           }
         />
       ) : null}
 
-      {clipId && loading ? <ScreenState kind="loading" title="Loading clip frames" /> : null}
+      {clipId && loading ? <ScreenState kind="loading" title="Loading alert clip" /> : null}
 
       {clipId && !loading && error ? (
         <ScreenState
@@ -118,25 +123,53 @@ export function EvidenceScreen() {
       {clipId && !loading && !error && clip ? (
         <View style={styles.stack}>
           <AppText variant="strong">
-            {clip.channel.toUpperCase()} · {clip.frames.length} frames
+            {clip.channel.toUpperCase()} clip
+            {clip.videoUrl ? " · mp4" : ` · ${clip.frames.length} frames`}
           </AppText>
-          <AppText variant="caption">
-            {clip.videoUrl ? `videoUrl: ${clip.videoUrl}` : "Frame sequence only (videoUrl is null)."}
-          </AppText>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-            {clip.frames.map((frame) => (
-              <View key={`${frame.at}-${frame.imageUrl}`} style={[styles.thumb, { borderColor: colors.line }]}>
-                <Image
-                  source={{ uri: bustMediaUrl(frame.imageUrl, frame.at) }}
-                  style={styles.image}
-                  contentFit="cover"
-                />
-                <AppText variant="caption" style={{ paddingHorizontal: 6 }}>
-                  {clock(frame.at)}
-                </AppText>
-              </View>
-            ))}
-          </ScrollView>
+
+          {clip.videoUrl ? (
+            <View style={[styles.player, { borderColor: colors.line }]}>
+              <WebView
+                originWhitelist={["*"]}
+                source={{ html: videoHtml }}
+                style={styles.webview}
+                allowsInlineMediaPlayback
+                mediaPlaybackRequiresUserAction={false}
+              />
+            </View>
+          ) : (
+            <AppText variant="caption">
+              videoUrl is null — the car could not encode the MP4. Showing still frames instead.
+            </AppText>
+          )}
+
+          {clip.videoUrl ? (
+            <Pressable onPress={() => void Linking.openURL(clip.videoUrl!)} hitSlop={8}>
+              <AppText variant="caption" style={{ color: colors.signal }}>
+                Open MP4 externally
+              </AppText>
+            </Pressable>
+          ) : null}
+
+          {clip.frames.length > 0 ? (
+            <>
+              <AppText variant="caption">Frame stills around the alert</AppText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+                {clip.frames.map((frame) => (
+                  <View key={`${frame.at}-${frame.imageUrl}`} style={[styles.thumb, { borderColor: colors.line }]}>
+                    <Image
+                      source={{ uri: bustMediaUrl(frame.imageUrl, frame.at) }}
+                      style={styles.image}
+                      contentFit="cover"
+                    />
+                    <AppText variant="caption" style={{ paddingHorizontal: 6 }}>
+                      {clock(frame.at)}
+                    </AppText>
+                  </View>
+                ))}
+              </ScrollView>
+            </>
+          ) : null}
         </View>
       ) : null}
     </Page>
@@ -152,6 +185,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   stack: { gap: 10 },
+  player: {
+    height: 220,
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 1,
+    backgroundColor: "#000",
+  },
+  webview: { flex: 1, backgroundColor: "#000" },
   row: { gap: 10, paddingVertical: 4 },
   thumb: {
     width: 160,

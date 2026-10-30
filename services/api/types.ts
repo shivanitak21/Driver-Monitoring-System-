@@ -107,13 +107,20 @@ export type LiveFrameDto = {
 
 export type VideoSessionDto = {
   url: string;
-  mode: "livekit" | "dummy";
+  mode: "livekit" | "local" | "dummy";
   token: string;
   room: string;
   tracks: string[];
   expiresAt: number;
   publisherOnline: boolean;
+  publish?: boolean;
   preview: string;
+};
+
+export type VideoCancelDto = {
+  ok: boolean;
+  publish: boolean;
+  room: string;
 };
 
 export type AlertClipDto = {

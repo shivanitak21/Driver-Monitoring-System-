@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Bell, Car, LocateFixed, Phone, Settings, Video, X } from "@/components/ui/icons";
+import { Bell, Car, LocateFixed, Settings, Video, X } from "@/components/ui/icons";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -20,7 +20,6 @@ import { useReduceMotion } from "@/hooks/useReduceMotion";
 import { timeAgo } from "@/constants/format";
 import {
   driverStateLabel,
-  formatCoords,
   formatEta,
   formatSpeed,
   liveMapGeometry,
@@ -60,7 +59,6 @@ export function LiveMapScreen() {
   const deviceFix = useRideStore((state) => state.deviceFix);
   const routeShift = useRideStore((state) => state.routeShift);
   const alerts = useRideStore((state) => state.alerts);
-  const startCall = useRideStore((state) => state.startCall);
   const refreshAll = useRideStore((state) => state.refreshAll);
   const bootstrapLive = useRideStore((state) => state.bootstrapLive);
   const [alertsOpen, setAlertsOpen] = useState(false);
@@ -334,8 +332,7 @@ export function LiveMapScreen() {
       >
         <View style={styles.actions}>
           <MapAction testID="home-vehicle" label="Vehicle" onPress={openVehicle} icon={<Car size={18} color={colors.ink} strokeWidth={1.75} />} />
-          <MapAction testID="home-video" label="Video" onPress={() => router.push("/cabin")} icon={<Video size={18} color={colors.ink} strokeWidth={1.75} />} />
-          <MapAction testID="home-audio" label="Audio" onPress={() => startCall("audio")} icon={<Phone size={18} color={colors.ink} strokeWidth={1.75} />} />
+          <MapAction testID="home-cabin" label="Cabin" onPress={() => router.push("/cabin")} icon={<Video size={18} color={colors.ink} strokeWidth={1.75} />} />
           <View style={styles.action}>
             <SosButton onPress={askSos} />
           </View>
@@ -362,8 +359,10 @@ export function LiveMapScreen() {
               <Metric label="Score" value={String(score)} />
             </View>
             {liveMode ? (
-              <AppText variant="caption" numberOfLines={2} style={{ marginTop: 8 }}>
-                {`${deviceId} · ${deviceState || "device"} · cam ${publisherOnline ? "on" : "off"} · ${openAlerts.length} alerts · ${formatCoords(position)} · ${Math.round(heading)}°`}
+              <AppText variant="caption" numberOfLines={1} style={{ marginTop: 8 }}>
+                {deviceOnline ? "Online" : "Offline"}
+                {publisherOnline ? " · cam on" : " · cam off"}
+                {openAlerts.length ? ` · ${openAlerts.length} open` : ""}
               </AppText>
             ) : null}
           </View>

@@ -10,6 +10,7 @@ import {
   normalizeLiveFrame,
   normalizeNotices,
   normalizeRide,
+  normalizeVideoCancel,
   normalizeVideoSession,
 } from "@/services/api/normalize";
 import type {
@@ -22,6 +23,7 @@ import type {
   SosRequest,
   SosResponse,
   TelemetryRequest,
+  VideoCancelDto,
 } from "@/services/api/types";
 import type {
   AlertClip,
@@ -32,6 +34,7 @@ import type {
   MediaChannel,
   RideAnalysis,
   SafetyAlert,
+  VideoCancelResult,
   VideoSession,
 } from "@/types/domain";
 
@@ -46,7 +49,10 @@ export type GuardianApi = {
   getCabin(rideId: string): Promise<CabinDto>;
   getAnalysis(rideId: string, channel?: MediaChannel): Promise<RideAnalysis>;
   getLiveFrame(rideId: string, channel: MediaChannel): Promise<LiveFrame>;
+  /** Starts Watch publish on the car. Do not call on every screen refresh. */
   getVideo(rideId: string, track?: "all" | "driver" | "cabin"): Promise<VideoSession>;
+  /** Stops Watch publish. Live stills keep updating. */
+  cancelVideo(rideId: string): Promise<VideoCancelResult>;
   getClip(rideId: string, clipId: string): Promise<AlertClip>;
   listGuardians(rideId: string): Promise<Guardian[]>;
   addGuardian(rideId: string, body: CreateGuardianRequest): Promise<{ id: string }>;
@@ -170,6 +176,16 @@ export function createGuardianApi(): GuardianApi {
       const session = normalizeVideoSession(raw as never);
       if (!session) throw new Error("Invalid video session payload from the API.");
       return session;
+    },
+
+    async cancelVideo(rideId) {
+      const raw = await apiRequest<VideoCancelDto>(
+        `/v1/rides/${encodeURIComponent(rideId)}/video/cancel`,
+        { method: "POST" },
+      );
+      const result = normalizeVideoCancel(raw);
+      if (!result) throw new Error("Invalid video cancel payload from the API.");
+      return result;
     },
 
     async getClip(rideId, clipId) {

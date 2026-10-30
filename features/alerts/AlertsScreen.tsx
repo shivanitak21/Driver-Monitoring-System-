@@ -9,7 +9,7 @@ import { AppText } from "@/components/ui/AppText";
 import { ScreenState } from "@/components/ui/ScreenState";
 import { Segmented } from "@/components/ui/Segmented";
 import { useOffline } from "@/components/system/OfflineBanner";
-import { clock, timeAgo } from "@/constants/format";
+import { timeAgo } from "@/constants/format";
 import type { AlertStatusFilter } from "@/services/api/types";
 import { useLiveApiRefresh } from "@/hooks/useLiveApiRefresh";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -77,7 +77,7 @@ export function AlertsScreen() {
       title="Alerts"
       subtitle={
         liveMode
-          ? `${visible.length} shown · ${alerts.length} total · ${openCount} open`
+          ? `${openCount} open · ${alerts.length} total`
           : openCount > 0
             ? `${openCount} open`
             : "Nothing waiting"
@@ -153,7 +153,7 @@ export function AlertsScreen() {
             <AlertTimelineItem
               key={alert.id}
               alert={alert}
-              timeLabel={`${timeAgo(alert.at)} · ${clock(alert.at)}`}
+              timeLabel={timeAgo(alert.at)}
               showLine={index < visible.length - 1}
               onAcknowledge={() => {
                 setActionError(null);

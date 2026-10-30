@@ -268,7 +268,10 @@ type RideState = {
   refreshHistory: () => Promise<void>;
   refreshAnalysis: () => Promise<void>;
   refreshFrames: () => Promise<void>;
-  refreshVideo: () => Promise<void>;
+  /** Starts Watch (GET /video). Do not call from generic refresh. */
+  startWatch: () => Promise<void>;
+  /** Stops Watch (POST /video/cancel). */
+  stopWatch: () => Promise<void>;
   refreshAll: () => Promise<void>;
   publishTelemetry: (fix: Coordinate) => Promise<void>;
 };
@@ -758,7 +761,6 @@ export const useRideStore = create<RideState>()(
             lastSyncedAt: Date.now(),
           });
           void get().refreshFrames();
-          void get().refreshVideo();
         } catch (error) {
           set({
             booting: false,
@@ -855,13 +857,30 @@ export const useRideStore = create<RideState>()(
           lastSyncedAt: Date.now(),
         });
       },
-      refreshVideo: async () => {
+      startWatch: async () => {
         if (!services.api) return;
         try {
           const videoSession = await services.api.getVideo(get().rideId, "all");
           set({
             videoSession,
             publisherOnline: videoSession.publisherOnline,
+            lastSyncedAt: Date.now(),
+            connectionError: null,
+          });
+        } catch (error) {
+          set({ connectionError: describeServiceError(error) });
+          throw error;
+        }
+      },
+      stopWatch: async () => {
+        if (!services.api) return;
+        try {
+          const result = await services.api.cancelVideo(get().rideId);
+          const current = get().videoSession;
+          set({
+            videoSession: current
+              ? { ...current, publish: result.publish, publisherOnline: false }
+              : null,
             lastSyncedAt: Date.now(),
             connectionError: null,
           });
@@ -896,7 +915,6 @@ export const useRideStore = create<RideState>()(
             lastSyncedAt: Date.now(),
           });
           void get().refreshFrames();
-          void get().refreshVideo();
         } catch (error) {
           set({
             refreshing: false,

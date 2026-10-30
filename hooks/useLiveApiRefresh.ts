@@ -15,7 +15,6 @@ export function useLiveApiRefresh(
   const refreshCabin = useRideStore((state) => state.refreshCabin);
   const refreshFrames = useRideStore((state) => state.refreshFrames);
   const refreshAnalysis = useRideStore((state) => state.refreshAnalysis);
-  const refreshVideo = useRideStore((state) => state.refreshVideo);
   const refreshHistory = useRideStore((state) => state.refreshHistory);
 
   useFocusEffect(
@@ -30,12 +29,8 @@ export function useLiveApiRefresh(
         return;
       }
       if (kind === "cabin") {
-        void Promise.all([
-          refreshCabin(),
-          refreshFrames(),
-          refreshAnalysis(),
-          refreshVideo().catch(() => undefined),
-        ]);
+        // Do not call GET /video here — that starts Watch publish on the car.
+        void Promise.all([refreshCabin(), refreshFrames(), refreshAnalysis()]);
         return;
       }
       if (kind === "notices") {
@@ -54,7 +49,6 @@ export function useLiveApiRefresh(
       refreshGuardians,
       refreshHistory,
       refreshNotices,
-      refreshVideo,
     ]),
   );
 }

@@ -130,15 +130,25 @@ export type LiveFrame = {
   imageUrl: string;
 };
 
+export type VideoMode = "livekit" | "local" | "dummy";
+
 export type VideoSession = {
   url: string;
-  mode: "livekit" | "dummy";
+  mode: VideoMode;
   token: string;
   room: string;
   tracks: string[];
   expiresAt: number;
   publisherOnline: boolean;
+  /** True after GET /video; car keeps sending until POST /video/cancel. */
+  publish: boolean;
   previewUrl: string;
+};
+
+export type VideoCancelResult = {
+  ok: boolean;
+  publish: boolean;
+  room: string;
 };
 
 export type AlertClip = {

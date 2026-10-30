@@ -123,3 +123,40 @@ export function X(props: IconProps) {
     </Svg>
   );
 }
+
+export function Mic(props: IconProps) {
+  return (
+    <Svg {...frame(props)}>
+      <Path d="M12 19v3" />
+      <Path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+      <Rect x="9" y="2" width="6" height="13" rx="3" />
+    </Svg>
+  );
+}
+
+export function Camera(props: IconProps) {
+  return (
+    <Svg {...frame(props)}>
+      <Path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+      <Circle cx="12" cy="13" r="3" />
+    </Svg>
+  );
+}
+
+export function Ear(props: IconProps) {
+  return (
+    <Svg {...frame(props)}>
+      <Path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10" />
+      <Path d="M6 8.5a3 3 0 0 0 6 0" />
+    </Svg>
+  );
+}
+
+export function CircleDot(props: IconProps) {
+  return (
+    <Svg {...frame(props)}>
+      <Circle cx="12" cy="12" r="10" />
+      <Circle cx="12" cy="12" r="3" />
+    </Svg>
+  );
+}
