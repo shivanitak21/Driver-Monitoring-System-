@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { Page } from "@/components/layout/Page";
+import { CabinLibrary } from "@/components/media/CabinLibrary";
 import { CabinMediaBar } from "@/components/media/CabinMediaBar";
 import { LiveStill } from "@/components/media/LiveStill";
 import { AnalysisPanel } from "@/components/safety/AnalysisPanel";
@@ -33,21 +34,29 @@ export function CabinScreen() {
   const passengerName = useRideStore((state) => state.passengerName);
   const deviceId = useRideStore((state) => state.deviceId);
   const publisherOnline = useRideStore((state) => state.publisherOnline);
+  const deviceState = useRideStore((state) => state.deviceState);
   const rideId = useRideStore((state) => state.rideId);
   const analysis = useRideStore((state) => state.analysis);
   const frameDms = useRideStore((state) => state.frameDms);
   const frameCms = useRideStore((state) => state.frameCms);
+  const recordings = useRideStore((state) => state.recordings);
+  const snapshots = useRideStore((state) => state.snapshots);
+  const guardians = useRideStore((state) => state.guardians);
   const liveMode = useRideStore((state) => state.liveMode);
   const refreshing = useRideStore((state) => state.refreshing);
   const refreshCabin = useRideStore((state) => state.refreshCabin);
   const refreshFrames = useRideStore((state) => state.refreshFrames);
   const refreshAnalysis = useRideStore((state) => state.refreshAnalysis);
+  const refreshGuardians = useRideStore((state) => state.refreshGuardians);
+  const refreshRecordings = useRideStore((state) => state.refreshRecordings);
+  const refreshSnapshots = useRideStore((state) => state.refreshSnapshots);
   const refreshAll = useRideStore((state) => state.refreshAll);
   const askSos = useRideStore((state) => state.askSos);
   const { colors } = useTheme();
   const [phase, setPhase] = useState<Phase>("idle");
   const [note, setNote] = useState("");
   const [camera, setCamera] = useState<CameraTab>("both");
+  const [frameTick, setFrameTick] = useState(0);
 
   useEffect(() => {
     if (!consent) {
@@ -60,7 +69,15 @@ export function CabinScreen() {
       void (async () => {
         try {
           if (liveMode) {
-            await Promise.all([refreshCabin(), refreshFrames(), refreshAnalysis()]);
+            await Promise.all([
+              refreshCabin(),
+              refreshFrames(),
+              refreshAnalysis(),
+              refreshGuardians().catch(() => undefined),
+              refreshRecordings().catch(() => undefined),
+              refreshSnapshots().catch(() => undefined),
+            ]);
+            if (alive) setFrameTick(Date.now());
           } else {
             await services.cabin.open({ camera: "cabin", fault });
           }
@@ -77,12 +94,24 @@ export function CabinScreen() {
       alive = false;
       clearTimeout(timer);
     };
-  }, [consent, fault, liveMode, refreshAnalysis, refreshCabin, refreshFrames]);
+  }, [
+    consent,
+    fault,
+    liveMode,
+    refreshAnalysis,
+    refreshCabin,
+    refreshFrames,
+    refreshGuardians,
+    refreshRecordings,
+    refreshSnapshots,
+  ]);
 
   useEffect(() => {
     if (!liveMode || !consent || phase !== "live") return;
     const id = setInterval(() => {
-      void Promise.all([refreshFrames(), refreshAnalysis().catch(() => undefined)]);
+      void Promise.all([refreshFrames(), refreshAnalysis().catch(() => undefined)]).then(() => {
+        setFrameTick(Date.now());
+      });
     }, 4000);
     return () => clearInterval(id);
   }, [consent, liveMode, phase, refreshAnalysis, refreshFrames]);
@@ -92,22 +121,31 @@ export function CabinScreen() {
   const styles = useMemo(
     () =>
       StyleSheet.create({
-        stack: { gap: 14 },
+        stack: { gap: 22 },
+        heroMeta: { gap: 10 },
         chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
         dual: { gap: 12 },
-        section: { gap: 10 },
+        section: { gap: 12 },
+        sectionHead: { gap: 4 },
       }),
-    [],
+    [colors],
   );
 
   const onRefresh = () => {
-    void Promise.all([refreshCabin(), refreshFrames(), refreshAnalysis()]);
+    void Promise.all([
+      refreshCabin(),
+      refreshFrames(),
+      refreshAnalysis(),
+      refreshGuardians().catch(() => undefined),
+      refreshRecordings().catch(() => undefined),
+      refreshSnapshots().catch(() => undefined),
+    ]);
   };
 
   return (
     <Page
       title="Cabin"
-      subtitle={liveMode ? `${passengerName || rideId} · ${deviceId}` : "Interior view"}
+      subtitle={liveMode ? `${passengerName || rideId}` : "Interior view"}
       refreshing={refreshing}
       onRefresh={liveMode ? onRefresh : undefined}
     >
@@ -142,43 +180,60 @@ export function CabinScreen() {
 
       {consent && phase === "live" ? (
         <View style={styles.stack}>
-          <View style={styles.chips}>
-            <StatusChip label={driverStateLabel(driverState)} tone={attentive ? "ok" : "danger"} />
-            <StatusChip label={publisherOnline ? "cam on" : "cam off"} tone={publisherOnline ? "ok" : "warn"} />
+          <View style={styles.heroMeta}>
+            <AppText variant="caption">
+              {deviceId}
+              {deviceState ? ` · ${deviceState}` : ""}
+            </AppText>
+            <View style={styles.chips}>
+              <StatusChip label={driverStateLabel(driverState)} tone={attentive ? "ok" : "danger"} />
+              <StatusChip
+                label={publisherOnline ? "Cameras on" : "Cameras off"}
+                tone={publisherOnline ? "ok" : "warn"}
+              />
+            </View>
           </View>
 
           {liveMode ? (
             <>
               <View style={styles.section}>
-                <AppText variant="strong">Live Watch</AppText>
-                <AppText variant="caption">
-                  Cabin stream: stitched driver + passenger video and cabin mic (LiveKit tracks named cabin).
-                </AppText>
+                <View style={styles.sectionHead}>
+                  <AppText variant="strong">Live</AppText>
+                  <AppText variant="caption">
+                    One cabin picture (driver + passenger) and cabin mic over LiveKit.
+                  </AppText>
+                </View>
                 <CabinMediaBar channel={snapChannel} />
               </View>
 
-              <Segmented
-                value={camera}
-                onChange={(id) => setCamera(id as CameraTab)}
-                items={[
-                  { id: "both", label: "Both" },
-                  { id: "dms", label: "Driver" },
-                  { id: "cms", label: "Cabin" },
-                ]}
-              />
-
-              {camera === "both" ? (
-                <View style={styles.dual}>
-                  <LiveStill frame={frameDms} label="Driver still" height={200} />
-                  <LiveStill frame={frameCms} label="Cabin still" height={200} />
+              <View style={styles.section}>
+                <View style={styles.sectionHead}>
+                  <AppText variant="strong">Stills</AppText>
+                  <AppText variant="caption">JPEG polls — not the Watch stream.</AppText>
                 </View>
-              ) : (
-                <LiveStill
-                  frame={camera === "cms" ? frameCms : frameDms}
-                  label={camera === "cms" ? "Cabin still" : "Driver still"}
-                  height={260}
+                <Segmented
+                  value={camera}
+                  onChange={(id) => setCamera(id as CameraTab)}
+                  items={[
+                    { id: "both", label: "Both" },
+                    { id: "dms", label: "Driver" },
+                    { id: "cms", label: "Cabin" },
+                  ]}
                 />
-              )}
+                {camera === "both" ? (
+                  <View style={styles.dual}>
+                    <LiveStill frame={frameDms} label="Driver" height={196} reloadToken={frameTick} />
+                    <LiveStill frame={frameCms} label="Cabin" height={196} reloadToken={frameTick} />
+                  </View>
+                ) : (
+                  <LiveStill
+                    frame={camera === "cms" ? frameCms : frameDms}
+                    label={camera === "cms" ? "Cabin" : "Driver"}
+                    height={260}
+                    reloadToken={frameTick}
+                  />
+                )}
+              </View>
 
               {(camera === "both" || camera === "dms") && (
                 <AnalysisPanel title="Driver" side={analysis?.dms} />
@@ -186,6 +241,13 @@ export function CabinScreen() {
               {(camera === "both" || camera === "cms") && (
                 <AnalysisPanel title="Cabin" side={analysis?.cms} />
               )}
+
+              <CabinLibrary recordings={recordings} snapshots={snapshots} />
+              {guardians.length === 0 ? (
+                <AppText variant="caption" style={{ color: colors.amber }}>
+                  No guardians loaded — Snap/Record need a guardianId (e.g. g-priya). Open Family or pull to refresh.
+                </AppText>
+              ) : null}
             </>
           ) : (
             <ScreenState kind="empty" title="Offline demo" body="Set EXPO_PUBLIC_TELEMETRY_URL for live cabin." />

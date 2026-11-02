@@ -127,6 +127,40 @@ export type VideoCancelDto = {
   room: string;
 };
 
+export type TalkSessionDto = {
+  url: string;
+  token: string;
+  room: string;
+  expiresAt: number;
+  tracks: string[];
+};
+
+export type TalkCancelDto = {
+  ok: boolean;
+  talk: boolean;
+  room: string;
+};
+
+export type GuardianRecordingDto = {
+  id: string;
+  rideId: string;
+  guardianId: string;
+  status: "recording" | "stopping" | "ready" | "failed" | string;
+  startedAt: number;
+  endedAt: number | null;
+  videoUrl: string | null;
+  audio: boolean;
+};
+
+export type GuardianSnapshotDto = {
+  id: string;
+  rideId: string;
+  guardianId: string;
+  channel: MediaChannel;
+  at: number;
+  url: string;
+};
+
 export type AlertClipDto = {
   id: string;
   rideId: string;

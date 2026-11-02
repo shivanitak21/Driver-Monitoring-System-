@@ -25,6 +25,8 @@ import type {
   DriverState,
   Guardian,
   GuardianNotice,
+  GuardianRecording,
+  GuardianSnapshot,
   HistoryRide,
   LiveFrame,
   MediaChannel,
@@ -32,8 +34,14 @@ import type {
   SafetyAlert,
   SafetyStatus,
   Seat,
+  TalkSession,
   VideoSession,
 } from "@/types/domain";
+
+function primaryGuardianId(guardians: Guardian[]): string | null {
+  const sharing = guardians.find((g) => g.sharing);
+  return (sharing ?? guardians[0])?.id ?? null;
+}
 
 const HOUR = 1000 * 60 * 60;
 
@@ -231,6 +239,10 @@ type RideState = {
   frameDms: LiveFrame | null;
   frameCms: LiveFrame | null;
   videoSession: VideoSession | null;
+  talkSession: TalkSession | null;
+  activeRecording: GuardianRecording | null;
+  recordings: GuardianRecording[];
+  snapshots: GuardianSnapshot[];
   fired: string[];
   alerts: SafetyAlert[];
   guardians: Guardian[];
@@ -261,7 +273,11 @@ type RideState = {
   patchAnalysis: (channel: MediaChannel, side: AnalysisSide) => void;
   setConnection: (connection: ConnectionState, error?: string | null) => void;
   bootstrapLive: () => Promise<void>;
-  refreshAlerts: (status?: AlertStatusFilter, channel?: MediaChannel) => Promise<void>;
+  refreshAlerts: (
+    status?: AlertStatusFilter,
+    channel?: MediaChannel,
+    startedAt?: number | null,
+  ) => Promise<void>;
   refreshGuardians: () => Promise<void>;
   refreshNotices: () => Promise<void>;
   refreshCabin: () => Promise<void>;
@@ -272,6 +288,16 @@ type RideState = {
   startWatch: () => Promise<void>;
   /** Stops Watch (POST /video/cancel). */
   stopWatch: () => Promise<void>;
+  /** Speak: phone mic → cabin (POST /video/talk). */
+  startTalk: () => Promise<void>;
+  stopTalk: () => Promise<void>;
+  /** Guardian cabin recording (POST /recordings). */
+  startRecording: () => Promise<void>;
+  stopRecording: () => Promise<void>;
+  refreshRecordings: () => Promise<void>;
+  /** Server-side snap of live still (POST /snapshots). */
+  takeSnapshot: (channel: MediaChannel) => Promise<GuardianSnapshot>;
+  refreshSnapshots: () => Promise<void>;
   refreshAll: () => Promise<void>;
   publishTelemetry: (fix: Coordinate) => Promise<void>;
 };
@@ -339,6 +365,10 @@ export const useRideStore = create<RideState>()(
       frameDms: null,
       frameCms: null,
       videoSession: null,
+      talkSession: null,
+      activeRecording: null,
+      recordings: [],
+      snapshots: [],
       fired: [],
       alerts: liveMode ? [] : seededAlerts,
       guardians: liveMode ? [] : initialGuardians,
@@ -769,13 +799,18 @@ export const useRideStore = create<RideState>()(
           });
         }
       },
-      refreshAlerts: async (_status = "all", _channel) => {
+      refreshAlerts: async (_status = "all", _channel, startedAt) => {
         if (!services.api) return;
         set({ refreshing: true });
         try {
-          // Always pull the full ride alert list so history/events stay complete.
           // Status/channel filters are applied in the UI.
-          const alerts = await services.api.listAlerts(get().rideId, "all");
+          // Pass startedAt for a single past trip (FRONTEND.md).
+          const alerts = await services.api.listAlerts(
+            get().rideId,
+            "all",
+            undefined,
+            startedAt ?? null,
+          );
           set({
             alerts,
             refreshing: false,
@@ -847,14 +882,28 @@ export const useRideStore = create<RideState>()(
       refreshFrames: async () => {
         if (!services.api) return;
         const rideId = get().rideId;
-        const [dms, cms] = await Promise.all([
-          services.api.getLiveFrame(rideId, "dms").catch(() => null),
-          services.api.getLiveFrame(rideId, "cms").catch(() => null),
+        const results = await Promise.allSettled([
+          services.api.getLiveFrame(rideId, "dms"),
+          services.api.getLiveFrame(rideId, "cms"),
         ]);
+        const dms = results[0].status === "fulfilled" ? results[0].value : null;
+        const cms = results[1].status === "fulfilled" ? results[1].value : null;
+        const firstError =
+          results[0].status === "rejected"
+            ? results[0].reason
+            : results[1].status === "rejected"
+              ? results[1].reason
+              : null;
         set({
-          frameDms: dms,
-          frameCms: cms,
+          // Keep last good frame when a poll fails (404 while offline, etc.).
+          frameDms: dms ?? get().frameDms,
+          frameCms: cms ?? get().frameCms,
           lastSyncedAt: Date.now(),
+          ...(dms || cms
+            ? { connectionError: null }
+            : firstError
+              ? { connectionError: describeServiceError(firstError) }
+              : {}),
         });
       },
       startWatch: async () => {
@@ -878,6 +927,135 @@ export const useRideStore = create<RideState>()(
           await services.api.cancelVideo(get().rideId);
           set({
             videoSession: null,
+            lastSyncedAt: Date.now(),
+            connectionError: null,
+          });
+        } catch (error) {
+          set({ connectionError: describeServiceError(error) });
+          throw error;
+        }
+      },
+      startTalk: async () => {
+        if (!services.api) return;
+        try {
+          const talkSession = await services.api.startTalk(get().rideId);
+          set({
+            talkSession,
+            lastSyncedAt: Date.now(),
+            connectionError: null,
+          });
+        } catch (error) {
+          set({ connectionError: describeServiceError(error) });
+          throw error;
+        }
+      },
+      stopTalk: async () => {
+        if (!services.api) return;
+        try {
+          await services.api.cancelTalk(get().rideId);
+          set({
+            talkSession: null,
+            lastSyncedAt: Date.now(),
+            connectionError: null,
+          });
+        } catch (error) {
+          set({ connectionError: describeServiceError(error) });
+          throw error;
+        }
+      },
+      startRecording: async () => {
+        if (!services.api) return;
+        const guardianId = primaryGuardianId(get().guardians);
+        if (!guardianId) throw new Error("Add a guardian before recording.");
+        try {
+          const recording = await services.api.startRecording(get().rideId, guardianId);
+          set({
+            activeRecording: recording.status === "recording" || recording.status === "stopping" ? recording : null,
+            recordings: [recording, ...get().recordings.filter((item) => item.id !== recording.id)],
+            lastSyncedAt: Date.now(),
+            connectionError: null,
+          });
+        } catch (error) {
+          set({ connectionError: describeServiceError(error) });
+          throw error;
+        }
+      },
+      stopRecording: async () => {
+        if (!services.api) return;
+        const active = get().activeRecording;
+        if (!active) return;
+        try {
+          const recording = await services.api.cancelRecording(get().rideId, active.id);
+          set({
+            activeRecording:
+              recording.status === "recording" || recording.status === "stopping" ? recording : null,
+            recordings: [recording, ...get().recordings.filter((item) => item.id !== recording.id)],
+            lastSyncedAt: Date.now(),
+            connectionError: null,
+          });
+          // Poll until ready/failed so videoUrl shows up in the library.
+          if (recording.status === "stopping" || recording.status === "recording") {
+            const id = recording.id;
+            void (async () => {
+              for (let i = 0; i < 15; i += 1) {
+                await new Promise((resolve) => setTimeout(resolve, 2000));
+                try {
+                  await get().refreshRecordings();
+                } catch {
+                  continue;
+                }
+                const latest = get().recordings.find((item) => item.id === id);
+                if (!latest || latest.status === "ready" || latest.status === "failed") break;
+              }
+            })();
+          }
+        } catch (error) {
+          set({ connectionError: describeServiceError(error) });
+          throw error;
+        }
+      },
+      refreshRecordings: async () => {
+        if (!services.api) return;
+        const guardianId = primaryGuardianId(get().guardians) ?? undefined;
+        try {
+          const recordings = await services.api.listRecordings(get().rideId, guardianId);
+          const active =
+            recordings.find((item) => item.status === "recording" || item.status === "stopping") ?? null;
+          set({
+            recordings,
+            activeRecording: active,
+            lastSyncedAt: Date.now(),
+            connectionError: null,
+          });
+        } catch (error) {
+          set({ connectionError: describeServiceError(error) });
+          throw error;
+        }
+      },
+      takeSnapshot: async (channel) => {
+        if (!services.api) throw new Error("API offline");
+        const guardianId = primaryGuardianId(get().guardians);
+        if (!guardianId) throw new Error("Add a guardian before snapping.");
+        try {
+          const snap = await services.api.createSnapshot(get().rideId, guardianId, channel);
+          set({
+            snapshots: [snap, ...get().snapshots.filter((item) => item.id !== snap.id)],
+            lastSyncedAt: Date.now(),
+            connectionError: null,
+          });
+          return snap;
+        } catch (error) {
+          set({ connectionError: describeServiceError(error) });
+          throw error;
+        }
+      },
+      refreshSnapshots: async () => {
+        if (!services.api) return;
+        const guardianId = primaryGuardianId(get().guardians) ?? undefined;
+        try {
+          const snapshots = await services.api.listSnapshots(get().rideId, guardianId);
+          set({
+            snapshots,
             lastSyncedAt: Date.now(),
             connectionError: null,
           });

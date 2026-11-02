@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 
@@ -13,25 +13,36 @@ export function LiveStill({
   label,
   staleMs = 15_000,
   height = 220,
+  /** Bump on each poll so expo-image reloads even if `at` is unchanged. */
+  reloadToken,
 }: {
   frame: LiveFrame | null;
   label: string;
   staleMs?: number;
   height?: number;
+  reloadToken?: number;
 }) {
   const { colors } = useTheme();
+  const [failed, setFailed] = useState(false);
   const ageMs = frame ? Math.abs(Date.now() - frame.at) : Number.POSITIVE_INFINITY;
   const stale = !frame || ageMs > staleMs;
-  const uri = frame ? bustMediaUrl(frame.imageUrl, frame.at) : "";
+  const uri = frame
+    ? bustMediaUrl(frame.imageUrl, reloadToken != null ? reloadToken : frame.at)
+    : "";
+
+  useEffect(() => {
+    setFailed(false);
+  }, [uri]);
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
         frame: {
           height,
-          borderRadius: 22,
+          borderRadius: 24,
           overflow: "hidden",
           backgroundColor: colors.bgSoft,
-          borderWidth: 1,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.line,
           justifyContent: "center",
         },
@@ -40,9 +51,9 @@ export function LiveStill({
           position: "absolute",
           left: 12,
           bottom: 12,
-          paddingHorizontal: 10,
-          paddingVertical: 6,
-          borderRadius: 999,
+          paddingHorizontal: 11,
+          paddingVertical: 7,
+          borderRadius: 12,
           backgroundColor: colors.glass,
           maxWidth: "90%",
         },
@@ -53,12 +64,25 @@ export function LiveStill({
 
   return (
     <View style={styles.frame}>
-      {uri ? (
-        <Image source={{ uri }} style={styles.image} contentFit="cover" transition={120} recyclingKey={uri} />
+      {uri && !failed ? (
+        <Image
+          source={{ uri }}
+          style={styles.image}
+          contentFit="cover"
+          transition={120}
+          cachePolicy="none"
+          recyclingKey={`${uri}-${reloadToken ?? frame?.at ?? 0}`}
+          onError={() => setFailed(true)}
+          onLoad={() => setFailed(false)}
+        />
       ) : (
         <View style={styles.empty}>
           <AppText variant="strong">{label}</AppText>
-          <AppText variant="caption">Waiting for GET /frames/live …</AppText>
+          <AppText variant="caption">
+            {failed
+              ? "Image failed to load — check HTTP cleartext / network."
+              : "Waiting for GET /frames/live …"}
+          </AppText>
         </View>
       )}
       <View style={styles.tag}>

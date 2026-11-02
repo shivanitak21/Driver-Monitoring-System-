@@ -5,10 +5,14 @@ import type {
   AnalysisDto,
   CabinDto,
   GuardianDto,
+  GuardianRecordingDto,
+  GuardianSnapshotDto,
   HistoryRideDto,
   LiveFrameDto,
   NoticeDto,
   RideDto,
+  TalkCancelDto,
+  TalkSessionDto,
   VideoSessionDto,
 } from "@/services/api/types";
 import type {
@@ -18,6 +22,9 @@ import type {
   DriverState,
   Guardian,
   GuardianNotice,
+  GuardianRecording,
+  GuardianRecordingStatus,
+  GuardianSnapshot,
   HistoryRide,
   LiveFrame,
   MediaChannel,
@@ -25,6 +32,8 @@ import type {
   SafetyAlert,
   SafetyStatus,
   Seat,
+  TalkCancelResult,
+  TalkSession,
   VideoSession,
 } from "@/types/domain";
 
@@ -310,6 +319,83 @@ export function normalizeVideoCancel(raw: Partial<{ ok: boolean; publish: boolea
     publish: asBoolean(raw.publish, false),
     room: asString(raw.room),
   };
+}
+
+export function normalizeTalkSession(raw: Partial<TalkSessionDto> | null | undefined): TalkSession | null {
+  if (!raw || typeof raw !== "object") return null;
+  const url = asString(raw.url);
+  const token = asString(raw.token);
+  if (!url || !token) return null;
+  return {
+    url,
+    token,
+    room: asString(raw.room),
+    expiresAt: asNumber(raw.expiresAt, 0) ?? 0,
+    tracks: Array.isArray(raw.tracks) ? raw.tracks.map((item) => String(item)) : ["guardian-mic"],
+  };
+}
+
+export function normalizeTalkCancel(raw: Partial<TalkCancelDto> | null | undefined): TalkCancelResult | null {
+  if (!raw || typeof raw !== "object") return null;
+  return {
+    ok: asBoolean(raw.ok, true),
+    talk: asBoolean(raw.talk, false),
+    room: asString(raw.room),
+  };
+}
+
+function normalizeRecordingStatus(value: unknown): GuardianRecordingStatus {
+  if (value === "stopping" || value === "ready" || value === "failed" || value === "recording") return value;
+  return "recording";
+}
+
+export function normalizeGuardianRecording(
+  raw: Partial<GuardianRecordingDto> | null | undefined,
+): GuardianRecording | null {
+  if (!raw || typeof raw !== "object") return null;
+  const id = asString(raw.id);
+  if (!id) return null;
+  return {
+    id,
+    rideId: asString(raw.rideId),
+    guardianId: asString(raw.guardianId),
+    status: normalizeRecordingStatus(raw.status),
+    startedAt: asNumber(raw.startedAt, 0) ?? 0,
+    endedAt: asNumber(raw.endedAt),
+    videoUrl: raw.videoUrl ? absoluteMediaUrl(asString(raw.videoUrl)) : null,
+    audio: asBoolean(raw.audio, true),
+  };
+}
+
+export function normalizeGuardianRecordings(raw: unknown): GuardianRecording[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => normalizeGuardianRecording(item as never))
+    .filter((item): item is GuardianRecording => Boolean(item));
+}
+
+export function normalizeGuardianSnapshot(
+  raw: Partial<GuardianSnapshotDto> | null | undefined,
+): GuardianSnapshot | null {
+  if (!raw || typeof raw !== "object") return null;
+  const id = asString(raw.id);
+  const path = asString(raw.url);
+  if (!id || !path) return null;
+  return {
+    id,
+    rideId: asString(raw.rideId),
+    guardianId: asString(raw.guardianId),
+    channel: raw.channel === "cms" ? "cms" : "dms",
+    at: asNumber(raw.at, 0) ?? 0,
+    imageUrl: absoluteMediaUrl(path),
+  };
+}
+
+export function normalizeGuardianSnapshots(raw: unknown): GuardianSnapshot[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => normalizeGuardianSnapshot(item as never))
+    .filter((item): item is GuardianSnapshot => Boolean(item));
 }
 
 export function normalizeAlertClip(raw: Partial<AlertClipDto> | null | undefined): AlertClip | null {

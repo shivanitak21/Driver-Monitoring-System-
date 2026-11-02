@@ -5,11 +5,17 @@ import {
   normalizeAlerts,
   normalizeAnalysis,
   normalizeCabin,
+  normalizeGuardianRecording,
+  normalizeGuardianRecordings,
+  normalizeGuardianSnapshot,
+  normalizeGuardianSnapshots,
   normalizeGuardians,
   normalizeHistoryRides,
   normalizeLiveFrame,
   normalizeNotices,
   normalizeRide,
+  normalizeTalkCancel,
+  normalizeTalkSession,
   normalizeVideoCancel,
   normalizeVideoSession,
 } from "@/services/api/normalize";
@@ -23,17 +29,23 @@ import type {
   SosRequest,
   SosResponse,
   TelemetryRequest,
+  TalkCancelDto,
+  TalkSessionDto,
   VideoCancelDto,
 } from "@/services/api/types";
 import type {
   AlertClip,
   Guardian,
   GuardianNotice,
+  GuardianRecording,
+  GuardianSnapshot,
   HistoryRide,
   LiveFrame,
   MediaChannel,
   RideAnalysis,
   SafetyAlert,
+  TalkCancelResult,
+  TalkSession,
   VideoCancelResult,
   VideoSession,
 } from "@/types/domain";
@@ -42,7 +54,12 @@ export type GuardianApi = {
   health(): Promise<HealthDto>;
   getRide(rideId: string, startedAt?: number | null): Promise<RideDto>;
   listHistory(deviceId?: string): Promise<HistoryRide[]>;
-  listAlerts(rideId: string, status?: AlertStatusFilter, channel?: MediaChannel): Promise<SafetyAlert[]>;
+  listAlerts(
+    rideId: string,
+    status?: AlertStatusFilter,
+    channel?: MediaChannel,
+    startedAt?: number | null,
+  ): Promise<SafetyAlert[]>;
   acknowledgeAlert(alertId: string): Promise<SafetyAlert>;
   raiseSos(rideId: string, body?: SosRequest): Promise<SosResponse>;
   postTelemetry(rideId: string, body: TelemetryRequest): Promise<RideDto>;
@@ -53,6 +70,14 @@ export type GuardianApi = {
   getVideo(rideId: string, track?: "all" | "driver" | "cabin"): Promise<VideoSession>;
   /** Stops Watch publish. Live stills keep updating. */
   cancelVideo(rideId: string): Promise<VideoCancelResult>;
+  /** Speak: phone mic → cabin. Separate from Watch. */
+  startTalk(rideId: string): Promise<TalkSession>;
+  cancelTalk(rideId: string): Promise<TalkCancelResult>;
+  startRecording(rideId: string, guardianId: string): Promise<GuardianRecording>;
+  cancelRecording(rideId: string, recordingId: string): Promise<GuardianRecording>;
+  listRecordings(rideId: string, guardianId?: string): Promise<GuardianRecording[]>;
+  createSnapshot(rideId: string, guardianId: string, channel: MediaChannel): Promise<GuardianSnapshot>;
+  listSnapshots(rideId: string, guardianId?: string): Promise<GuardianSnapshot[]>;
   getClip(rideId: string, clipId: string): Promise<AlertClip>;
   listGuardians(rideId: string): Promise<Guardian[]>;
   addGuardian(rideId: string, body: CreateGuardianRequest): Promise<{ id: string }>;
@@ -90,10 +115,18 @@ export function createGuardianApi(): GuardianApi {
       return normalizeHistoryRides(raw?.rides);
     },
 
-    async listAlerts(rideId, status = "all", channel) {
+    async listAlerts(rideId, status = "all", channel, startedAt) {
       const raw = await apiRequest<{ alerts?: unknown }>(
         `/v1/rides/${encodeURIComponent(rideId)}/alerts`,
-        { query: { status, channel } },
+        {
+          query: {
+            status,
+            channel,
+            ...(startedAt != null && Number.isFinite(startedAt)
+              ? { startedAt: Math.trunc(startedAt) }
+              : {}),
+          },
+        },
       );
       return normalizeAlerts(raw?.alerts);
     },
@@ -191,6 +224,79 @@ export function createGuardianApi(): GuardianApi {
       const result = normalizeVideoCancel(raw);
       if (!result) throw new Error("Invalid video cancel payload from the API.");
       return result;
+    },
+
+    async startTalk(rideId) {
+      const raw = await apiRequest<TalkSessionDto>(
+        `/v1/rides/${encodeURIComponent(rideId)}/video/talk`,
+        { method: "POST" },
+      );
+      const session = normalizeTalkSession(raw);
+      if (!session) throw new Error("Invalid talk session payload from the API.");
+      return session;
+    },
+
+    async cancelTalk(rideId) {
+      const raw = await apiRequest<TalkCancelDto>(
+        `/v1/rides/${encodeURIComponent(rideId)}/video/talk/cancel`,
+        { method: "POST" },
+      );
+      const result = normalizeTalkCancel(raw);
+      if (!result) throw new Error("Invalid talk cancel payload from the API.");
+      return result;
+    },
+
+    async startRecording(rideId, guardianId) {
+      const raw = await apiRequest(
+        `/v1/rides/${encodeURIComponent(rideId)}/recordings`,
+        {
+          method: "POST",
+          body: { action: "start", guardianId },
+        },
+      );
+      const recording = normalizeGuardianRecording(raw as never);
+      if (!recording) throw new Error("Invalid recording payload from the API.");
+      return recording;
+    },
+
+    async cancelRecording(rideId, recordingId) {
+      const raw = await apiRequest(
+        `/v1/rides/${encodeURIComponent(rideId)}/recordings/${encodeURIComponent(recordingId)}/cancel`,
+        { method: "POST" },
+      );
+      const recording = normalizeGuardianRecording(raw as never);
+      if (!recording) throw new Error("Invalid recording cancel payload from the API.");
+      return recording;
+    },
+
+    async listRecordings(rideId, guardianId) {
+      const raw = await apiRequest<{ recordings?: unknown }>(
+        `/v1/rides/${encodeURIComponent(rideId)}/recordings`,
+        { query: guardianId ? { guardianId } : undefined },
+      );
+      return normalizeGuardianRecordings(
+        Array.isArray(raw) ? raw : (raw as { recordings?: unknown })?.recordings ?? raw,
+      );
+    },
+
+    async createSnapshot(rideId, guardianId, channel) {
+      const raw = await apiRequest(`/v1/rides/${encodeURIComponent(rideId)}/snapshots`, {
+        method: "POST",
+        body: { guardianId, channel },
+      });
+      const snap = normalizeGuardianSnapshot(raw as never);
+      if (!snap) throw new Error("Invalid snapshot payload from the API.");
+      return snap;
+    },
+
+    async listSnapshots(rideId, guardianId) {
+      const raw = await apiRequest<{ snapshots?: unknown }>(
+        `/v1/rides/${encodeURIComponent(rideId)}/snapshots`,
+        { query: guardianId ? { guardianId } : undefined },
+      );
+      return normalizeGuardianSnapshots(
+        Array.isArray(raw) ? raw : (raw as { snapshots?: unknown })?.snapshots ?? raw,
+      );
     },
 
     async getClip(rideId, clipId) {

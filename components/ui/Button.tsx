@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import * as Haptics from "expo-haptics";
+import { selectionFeedback } from "@/utils/haptics";
 
 import { AppText } from "@/components/ui/AppText";
 import { radius } from "@/constants/theme";
@@ -61,7 +61,7 @@ export function Button({ label, onPress, tone = "lime", disabled = false, testID
       accessibilityRole="button"
       disabled={disabled}
       onPress={() => {
-        void Haptics.selectionAsync();
+        void selectionFeedback();
         onPress();
       }}
       style={({ pressed }) => [
@@ -121,7 +121,7 @@ export function IconButton({
       accessibilityLabel={label}
       accessibilityRole="button"
       onPress={() => {
-        void Haptics.selectionAsync();
+        void selectionFeedback();
         onPress();
       }}
       style={({ pressed }) => [styles.icon, pressed && { opacity: 0.82, transform: [{ scale: 0.96 }] }]}

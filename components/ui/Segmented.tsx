@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import * as Haptics from "expo-haptics";
+import { selectionFeedback } from "@/utils/haptics";
 
 import { AppText } from "@/components/ui/AppText";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -53,7 +53,7 @@ export function Segmented({
             accessibilityRole="button"
             accessibilityState={{ selected }}
             onPress={() => {
-              void Haptics.selectionAsync();
+              void selectionFeedback();
               onChange(item.id);
             }}
             style={[styles.item, selected && styles.itemOn]}

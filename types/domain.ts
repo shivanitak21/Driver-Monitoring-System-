@@ -158,6 +158,45 @@ export type VideoCancelResult = {
   room: string;
 };
 
+/** Phone mic → cabin speaker (POST /video/talk). Separate from Watch. */
+export type TalkSession = {
+  url: string;
+  token: string;
+  room: string;
+  expiresAt: number;
+  tracks: string[];
+};
+
+export type TalkCancelResult = {
+  ok: boolean;
+  talk: boolean;
+  room: string;
+};
+
+export type GuardianRecordingStatus = "recording" | "stopping" | "ready" | "failed";
+
+/** Guardian-started cabin recording (not an alert clip). */
+export type GuardianRecording = {
+  id: string;
+  rideId: string;
+  guardianId: string;
+  status: GuardianRecordingStatus;
+  startedAt: number;
+  endedAt: number | null;
+  videoUrl: string | null;
+  audio: boolean;
+};
+
+/** Guardian snap of the current live still. */
+export type GuardianSnapshot = {
+  id: string;
+  rideId: string;
+  guardianId: string;
+  channel: MediaChannel;
+  at: number;
+  imageUrl: string;
+};
+
 export type AlertClip = {
   id: string;
   rideId: string;

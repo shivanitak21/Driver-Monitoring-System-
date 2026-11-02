@@ -19,11 +19,13 @@ No trailing slash on the base URL. Leave `EXPO_PUBLIC_MQTT_URL` empty.
 | Ride id | `ride-1842` |
 | Device id | `orin-nano-01` |
 
-There is no auth header. CORS allows any origin. Unknown rides return `404` with `{ "detail": "ride not found" }`. Sharing off returns `403` with `{ "detail": "sharing is off" }` on video, frames, and clips.
+There is no auth header. CORS allows any origin. Unknown rides return `404` with `{ "detail": "ride not found" }`. Sharing off returns `403` with `{ "detail": "sharing is off" }` on video, frames, clips, recordings, and snaps.
 
 Times named `at`, `startedAt`, `endedAt`, `expiresAt`, and `lastNotifiedAt` are Unix epoch **milliseconds**. `updatedAt` is an ISO-8601 string.
 
 Do not put these in the app: `MEDIA_DEVICE_KEY`, `LIVEKIT_API_SECRET`, MQTT password, EMQX dashboard password.
+
+Share this file. The new calls are Speak (`POST /video/talk`), guardian recordings and snaps (lists filtered by `guardianId`), alerts for one trip (`GET /alerts?startedAt=`), and push after `POST /push-token`. Alert clip id is still `alerts[].clipId`. The live cabin stream is still `GET /video` (track `cabin`).
 
 ---
 
@@ -34,13 +36,16 @@ Do not put these in the app: `MEDIA_DEVICE_KEY`, `LIVEKIT_API_SECRET`, MQTT pass
 | Trip home | `GET /v1/rides/{rideId}` once, then WebSocket `/v1/rides/{rideId}/live` |
 | Device online | `ride.deviceState` and `ride.publisherOnline` from the ride or the `status` socket event |
 | Map | `POST /v1/rides/{rideId}/telemetry` |
-| Alerts | `GET /v1/rides/{rideId}/alerts`, then socket `alert` / `sos`. Ack with `POST /v1/alerts/{alertId}/ack` |
+| Alerts | `GET /v1/rides/{rideId}/alerts`, then socket `alert` / `sos`. Ack with `POST /v1/alerts/{alertId}/ack`. A past trip uses `?startedAt=` |
+| Speak | `POST /v1/rides/{rideId}/video/talk` publishes the phone mic as `guardian-mic`. `POST .../video/talk/cancel` stops it |
 | VLM text | `GET /v1/rides/{rideId}/analysis?channel=dms` or `cms`, then socket `analysis` |
 | Live still | `GET /v1/rides/{rideId}/frames/live?channel=dms` or `cms`, then load `url` |
 | Live video | `GET /v1/rides/{rideId}/video` starts it. `POST /v1/rides/{rideId}/video/cancel` stops it |
 | Past trips | `GET /v1/history?deviceId=orin-nano-01`. Several rows share `id: ride-1842`. Switch trips with `startedAt`. |
 | Past trip map | `GET /v1/rides/ride-1842?startedAt={startedAt}` and draw `route` |
 | Alert clip | `alerts[].clipId` from `GET /v1/rides/{rideId}/alerts`, then `GET /v1/rides/{rideId}/clips/{clipId}` |
+| Record | `POST /v1/rides/{rideId}/recordings` with `{"action":"start","guardianId":"..."}`. Stop with `POST .../recordings/{id}/cancel`. List with `GET .../recordings?guardianId=` |
+| Snap | `POST /v1/rides/{rideId}/snapshots`. List with `GET .../snapshots?guardianId=` |
 | SOS | `POST /v1/rides/{rideId}/sos` |
 | Cabin seats | `GET /v1/rides/{rideId}/cabin` |
 | Guardians | list, `POST` to add, `POST .../sharing` to toggle |
@@ -196,13 +201,15 @@ An unknown `startedAt` still returns `200` and `route: []`. It does not 404.
 
 Leave `startedAt` off (`GET /v1/rides/ride-1842`) for the live home screen. That returns the newest trip that already has a GPS point, which may be the open trip.
 
-`GET /v1/rides/{id}/alerts` is unchanged and is not filtered by `startedAt`. Alerts on the history map are still every alert for `ride-1842`. `coordinate.latitude` / `coordinate.longitude` on an alert is where to drop that alert pin when those values are not null.
+`GET /v1/rides/{id}/alerts?startedAt={ms}` returns only alerts from that trip. An unknown `startedAt` returns `200` and `alerts: []`. Leave `startedAt` off for every alert on the ride. Drop a map pin where `coordinate.latitude` and `coordinate.longitude` are not null.
 
 ---
 
 ## Alerts
 
-`GET /v1/rides/{rideId}/alerts?status=all&channel=dms`
+`GET /v1/rides/{rideId}/alerts?status=all&channel=dms&startedAt={ms}`
+
+`startedAt` is optional. When it is set, the list is that trip only (`at` from `startedAt` through `endedAt`, or still open if the trip has not ended).
 
 `status`: `all` (default), `open`, `emergency` (`high` or `critical`), `caution` (`info`, `low`, `medium`). Unknown `status` returns every alert.
 
@@ -361,6 +368,30 @@ Watch is one cabin stream: driver and passenger stitched into one picture, plus 
 
 `404` if the ride does not exist. The next time the car asks for a token it stops sending the stream. The live stills keep updating.
 
+## Speak
+
+This is the phone microphone played on the cabin speaker. It is separate from Watch. Watch sends the cabin microphone to the phone.
+
+`POST /v1/rides/{rideId}/video/talk` has no body. The app publishes one audio track named `guardian-mic` and does not subscribe.
+
+```json
+{
+  "url": "ws://YOUR_VPS_IP:7880",
+  "token": "<jwt canPublish microphone only>",
+  "room": "ride-1842",
+  "expiresAt": 1761560900000,
+  "tracks": ["guardian-mic"]
+}
+```
+
+`POST /v1/rides/{rideId}/video/talk/cancel` stops it. The car drops the speaker on its next poll.
+
+```json
+{ "ok": true, "talk": false, "room": "ride-1842" }
+```
+
+`403` when sharing is off. `409` when the server is not in LiveKit mode. Cancel does not stop Watch.
+
 `GET /v1/rides/{rideId}/video/preview?track=driver` returns a JPEG body (`track` is `driver` or `cabin`). That JPEG is the Watch fallback. The trip still is `frames/live`. The moving stream is LiveKit when `mode` is `livekit`.
 
 ---
@@ -445,11 +476,12 @@ All fields are optional.
   "topic": "ride/ride-1842/sos",
   "origin": "device",
   "note": "Notified Priya Shah",
+  "pushed": 1,
   "alert": {}
 }
 ```
 
-`note` is `"Notified nobody sharing"` when no guardian has sharing on. `alert` is an Alert. This also pushes a `sos` event on the live socket.
+`note` is `"Notified nobody sharing"` when no guardian has sharing on. `alert` is an Alert. `pushed` is how many phones were sent a notification. This also pushes a `sos` event on the live socket.
 
 ---
 
@@ -547,7 +579,9 @@ You cannot edit the name or phone, and you cannot delete a guardian.
 { "token": "<fcm token>", "ride_id": "ride-1842" }
 ```
 
-`ride_id` is accepted and ignored. Response: `{ "ok": true }`. The token is stored. Push delivery is not implemented yet.
+`ride_id` is accepted and ignored. Response: `{ "ok": true }`.
+
+SOS and alerts with severity `high` or `critical` are sent to every sharing guardian who has a token. An Expo token (`ExponentPushToken[...]`) is delivered by Expo. Any other token is delivered by FCM when `FCM_SERVER_KEY` is set on the API. The notification `data` is `rideId`, `alertId`, `kind`, and `severity`. Lower alerts stay on the WebSocket only.
 
 ---
 
@@ -568,6 +602,58 @@ Use this to confirm the API is up. The app does not need to poll it.
 
 ---
 
+## Guardian recordings and snaps
+
+These are what the guardian starts. They are nrot alert clips. Alert clips stay on `alerts[].clipId`.
+
+`POST /v1/rides/{rideId}/recordings`
+
+```json
+{ "action": "start", "guardianId": "g-priya" }
+```
+
+```json
+{
+  "id": "rec-ab12cd34",
+  "rideId": "ride-1842",
+  "guardianId": "g-priya",
+  "status": "recording",
+  "startedAt": 1761560000000,
+  "endedAt": null,
+  "videoUrl": null,
+  "audio": true
+}
+```
+
+The car records the cabin picture and the cabin microphone until she stops it, or for 10 minutes. `POST /v1/rides/{rideId}/recordings/{id}/cancel` sets `status` to `stopping`. When the file is uploaded, `status` is `ready` and `videoUrl` is `/v1/media/recordings/{id}/clip.mp4`. Play `{BASE}` + `videoUrl`. The MP4 contains the video and the cabin audio.
+
+`GET /v1/rides/{rideId}/recordings?guardianId=g-priya` lists her takes, newest first. Omit `guardianId` for every recording on the trip.
+
+`POST /v1/rides/{rideId}/snapshots`
+
+```json
+{ "guardianId": "g-priya", "channel": "dms" }
+```
+
+`channel` is `dms` or `cms`. This copies the current live still. `404` if no still has arrived yet.
+
+```json
+{
+  "id": "snap-ab12cd34",
+  "rideId": "ride-1842",
+  "guardianId": "g-priya",
+  "channel": "dms",
+  "at": 1761560000000,
+  "url": "/v1/media/snapshots/snap-ab12cd34/snap.jpg"
+}
+```
+
+`GET /v1/rides/{rideId}/snapshots?guardianId=g-priya` is her snap list. Load `{BASE}` + `url`.
+
+`403` when sharing is off. One recording can be in progress per ride. A second start returns that same recording.
+
+---
+
 ## Do not call from the app
 
 These are for the Jetson. They require `MEDIA_DEVICE_KEY`, which the phone must not have.
@@ -576,3 +662,4 @@ These are for the Jetson. They require `MEDIA_DEVICE_KEY`, which the phone must 
 - `POST /v1/devices/{deviceId}/video/frame`
 - `POST /v1/devices/{deviceId}/video/live`
 - `POST /v1/devices/{deviceId}/clips`
+- `POST /v1/devices/{deviceId}/recordings/{id}`

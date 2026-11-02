@@ -3,8 +3,9 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { Bell, Navigation, Route, Users, Video } from "@/components/ui/icons";
 import { router } from "expo-router";
 import type { BottomTabBarProps } from "expo-router/js-tabs";
-import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { selectionFeedback } from "@/utils/haptics";
 
 import { AppText } from "@/components/ui/AppText";
 import { Glass } from "@/components/ui/Glass";
@@ -85,7 +86,7 @@ export function DockTabBar({ state, emitter, navigateToTab, insets }: BottomTabB
                   accessibilityState={{ selected: focused }}
                   accessibilityLabel={item.label}
                   onPress={() => {
-                    void Haptics.selectionAsync();
+                    void selectionFeedback();
                     const event = emitter.emit({
                       type: "tabPress",
                       target: route.key,

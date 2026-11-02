@@ -49,11 +49,23 @@ const config: ExpoConfig = {
       NSLocationWhenInUseUsageDescription: "VMS shows your location on the map next to the ride.",
       NSCameraUsageDescription: "VMS uses the camera when you start a video call.",
       NSMicrophoneUsageDescription: "VMS uses the microphone when you start a call.",
+      // Guardian API + LiveKit are plain HTTP/WS on the demo VPS.
+      NSAppTransportSecurity: {
+        NSAllowsArbitraryLoads: true,
+      },
     },
   },
   android: {
     package: "com.vms.safety",
     predictiveBackGestureEnabled: false,
+    // Allow http:// stills + ws:// LiveKit on the demo VPS.
+    usesCleartextTraffic: true,
+    permissions: [
+      "android.permission.RECORD_AUDIO",
+      "android.permission.MODIFY_AUDIO_SETTINGS",
+      "android.permission.INTERNET",
+      "android.permission.ACCESS_NETWORK_STATE",
+    ],
     adaptiveIcon: {
       backgroundColor: "#07080A",
       foregroundImage: "./assets/android-icon-foreground.png",

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import * as Haptics from "expo-haptics";
+import { Haptics, notificationFeedback } from "@/utils/haptics";
 
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
@@ -41,7 +41,7 @@ export function SosConfirm() {
               onPress={() => {
                 setBusy(true);
                 setError(null);
-                void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                void notificationFeedback(Haptics.NotificationFeedbackType.Warning);
                 void confirm()
                   .catch((err: Error) => setError(err.message || "SOS failed"))
                   .finally(() => setBusy(false));

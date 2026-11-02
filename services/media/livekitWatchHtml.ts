@@ -1,6 +1,8 @@
 /**
  * Minimal LiveKit viewer HTML for WebView.
  * Subscribes to remote tracks named "cabin" (video + audio) per FRONTEND.md.
+ * Page must be served from an http(s) base that allows the LiveKit ws/wss URL
+ * (do not use https://localhost with ws:// — browsers block that).
  */
 export function buildLiveKitWatchHtml(options: {
   url: string;
@@ -36,8 +38,7 @@ export function buildLiveKitWatchHtml(options: {
 <body>
   <div id="stage"><video id="video" playsinline webkit-playsinline autoplay muted></video></div>
   <div id="tap">Tap to enable cabin audio</div>
-  <div id="status">Connecting…</div>
-  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.9.1/dist/livekit-client.umd.min.js"></script>
+  <div id="status">Loading player…</div>
   <script>
     (function () {
       var statusEl = document.getElementById("status");
@@ -49,6 +50,15 @@ export function buildLiveKitWatchHtml(options: {
       var pendingAudioTrack = null;
       var hasVideo = false;
       var hasAudio = false;
+      var remoteVideoTrack = null;
+      var remoteAudioTrack = null;
+      var mediaRecorder = null;
+      var recordChunks = [];
+      var recording = false;
+      var cdns = [
+        "https://cdn.jsdelivr.net/npm/livekit-client@2.9.1/dist/livekit-client.umd.min.js",
+        "https://unpkg.com/livekit-client@2.9.1/dist/livekit-client.umd.min.js"
+      ];
 
       function post(payload) {
         try {
@@ -82,11 +92,13 @@ export function buildLiveKitWatchHtml(options: {
 
       function attachVideo(track) {
         try {
+          remoteVideoTrack = track;
           track.attach(videoEl);
           videoEl.muted = true;
           videoEl.playsInline = true;
           videoEl.play().catch(function () {});
           hasVideo = true;
+          post({ type: "track", kind: "video" });
           updateStatus();
         } catch (e) {
           setStatus("Video attach failed");
@@ -105,6 +117,7 @@ export function buildLiveKitWatchHtml(options: {
 
       function attachAudio(track) {
         pendingAudioTrack = track;
+        remoteAudioTrack = track;
         if (!listen) {
           hasAudio = false;
           updateStatus();
@@ -120,6 +133,7 @@ export function buildLiveKitWatchHtml(options: {
             play.then(function () {
               hasAudio = true;
               tapEl.style.display = "none";
+              post({ type: "track", kind: "audio" });
               updateStatus();
             }).catch(function () {
               tapEl.style.display = "flex";
@@ -127,6 +141,7 @@ export function buildLiveKitWatchHtml(options: {
             });
           } else {
             hasAudio = true;
+            post({ type: "track", kind: "audio" });
             updateStatus();
           }
           if (room && room.startAudio) {
@@ -148,7 +163,7 @@ export function buildLiveKitWatchHtml(options: {
         else if (hasVideo && listen) setStatus("Cabin video · waiting for mic…");
         else if (hasVideo) setStatus("Watching cabin · audio muted");
         else if (listen) setStatus("Connected · waiting for cabin video + mic");
-        else setStatus("Connected · waiting for cabin video");
+        else setStatus("Connected · waiting for cabin publisher");
       }
 
       function handleTrack(track, pub) {
@@ -156,6 +171,7 @@ export function buildLiveKitWatchHtml(options: {
         var kind = kindOf(pub, track);
         var cabin = isCabin(pub, track);
         if (kind === "video") {
+          // Prefer cabin; otherwise take first video so a misnamed track still shows.
           if (cabin || !hasVideo) attachVideo(track);
           return;
         }
@@ -180,8 +196,35 @@ export function buildLiveKitWatchHtml(options: {
         if (room && room.startAudio) room.startAudio().catch(function () {});
       });
 
+      function loadScript(src) {
+        return new Promise(function (resolve, reject) {
+          var s = document.createElement("script");
+          s.src = src;
+          s.async = true;
+          s.onload = function () { resolve(src); };
+          s.onerror = function () { reject(new Error("Failed " + src)); };
+          document.head.appendChild(s);
+        });
+      }
+
+      async function ensureSdk() {
+        if (window.LivekitClient || window.LiveKit) return;
+        var last = null;
+        for (var i = 0; i < cdns.length; i++) {
+          try {
+            await loadScript(cdns[i]);
+            if (window.LivekitClient || window.LiveKit) return;
+          } catch (e) {
+            last = e;
+          }
+        }
+        throw last || new Error("LiveKit SDK failed to load");
+      }
+
       async function start() {
         try {
+          setStatus("Loading LiveKit…");
+          await ensureSdk();
           var LK = window.LivekitClient || window.LiveKit;
           if (!LK || !LK.Room) {
             setStatus("LiveKit SDK failed to load");
@@ -196,6 +239,7 @@ export function buildLiveKitWatchHtml(options: {
             handleTrack(track, publication);
           });
           room.on(RoomEvent.ParticipantConnected, function (p) {
+            setStatus("Publisher joined…");
             wireParticipant(p);
           });
           room.on(RoomEvent.Disconnected, function () {
@@ -206,17 +250,157 @@ export function buildLiveKitWatchHtml(options: {
           setStatus("Connecting to cabin…");
           await room.connect(${url}, ${token});
           post({ type: "connected", room: room.name || "" });
-
           if (room.remoteParticipants && room.remoteParticipants.forEach) {
             room.remoteParticipants.forEach(wireParticipant);
           }
-          updateStatus();
+          if (!room.remoteParticipants || room.remoteParticipants.size === 0) {
+            setStatus("In room · waiting for car to publish cabin");
+          } else {
+            updateStatus();
+          }
         } catch (err) {
           var msg = (err && err.message) ? err.message : "Connect failed";
           setStatus(msg);
           post({ type: "error", message: msg });
         }
       }
+
+      function pickRecorderMime() {
+        if (typeof MediaRecorder === "undefined") return null;
+        var types = [
+          "video/webm;codecs=vp8,opus",
+          "video/webm;codecs=vp9,opus",
+          "video/webm",
+          "video/mp4"
+        ];
+        for (var i = 0; i < types.length; i++) {
+          try {
+            if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(types[i])) return types[i];
+          } catch (e) {}
+        }
+        return "";
+      }
+
+      function buildRecordStream() {
+        var stream = new MediaStream();
+        var added = 0;
+        try {
+          if (videoEl && videoEl.srcObject) {
+            videoEl.srcObject.getTracks().forEach(function (t) {
+              stream.addTrack(t);
+              added += 1;
+            });
+          }
+        } catch (e) {}
+        if (added === 0 && remoteVideoTrack && remoteVideoTrack.mediaStreamTrack) {
+          stream.addTrack(remoteVideoTrack.mediaStreamTrack);
+          added += 1;
+        }
+        if (remoteAudioTrack && remoteAudioTrack.mediaStreamTrack) {
+          try {
+            stream.addTrack(remoteAudioTrack.mediaStreamTrack);
+            added += 1;
+          } catch (e) {}
+        } else if (audioEl && audioEl.srcObject) {
+          try {
+            audioEl.srcObject.getAudioTracks().forEach(function (t) {
+              stream.addTrack(t);
+              added += 1;
+            });
+          } catch (e) {}
+        }
+        return added > 0 ? stream : null;
+      }
+
+      function postBase64Chunks(dataUrl, mime) {
+        var parts = String(dataUrl || "").split(",");
+        var b64 = parts.length > 1 ? parts[1] : parts[0];
+        if (!b64) {
+          post({ type: "recording-error", message: "Empty recording" });
+          return;
+        }
+        var chunkSize = 180000;
+        var total = Math.ceil(b64.length / chunkSize) || 1;
+        post({ type: "recording-begin", total: total, mime: mime || "video/webm", bytes: b64.length });
+        for (var i = 0; i < total; i++) {
+          post({
+            type: "recording-chunk",
+            index: i,
+            total: total,
+            data: b64.slice(i * chunkSize, (i + 1) * chunkSize)
+          });
+        }
+        post({ type: "recording-done", total: total, mime: mime || "video/webm" });
+      }
+
+      window.__vmsStartLocalRecord = function () {
+        try {
+          if (recording) {
+            post({ type: "recording-status", message: "already recording" });
+            return;
+          }
+          if (typeof MediaRecorder === "undefined") {
+            post({ type: "recording-error", message: "MediaRecorder not available on this WebView" });
+            return;
+          }
+          var stream = buildRecordStream();
+          if (!stream) {
+            post({ type: "recording-error", message: "No live cabin tracks yet — wait for video, then Record" });
+            return;
+          }
+          var mime = pickRecorderMime();
+          recordChunks = [];
+          mediaRecorder = mime
+            ? new MediaRecorder(stream, { mimeType: mime })
+            : new MediaRecorder(stream);
+          var usedMime = mediaRecorder.mimeType || mime || "video/webm";
+          mediaRecorder.ondataavailable = function (ev) {
+            if (ev.data && ev.data.size > 0) recordChunks.push(ev.data);
+          };
+          mediaRecorder.onerror = function () {
+            recording = false;
+            post({ type: "recording-error", message: "Recorder failed" });
+          };
+          mediaRecorder.onstop = function () {
+            recording = false;
+            var blob = new Blob(recordChunks, { type: usedMime });
+            recordChunks = [];
+            if (!blob.size) {
+              post({ type: "recording-error", message: "Recording was empty" });
+              return;
+            }
+            var reader = new FileReader();
+            reader.onloadend = function () {
+              postBase64Chunks(String(reader.result || ""), usedMime);
+            };
+            reader.onerror = function () {
+              post({ type: "recording-error", message: "Could not read recording" });
+            };
+            reader.readAsDataURL(blob);
+          };
+          mediaRecorder.start(1000);
+          recording = true;
+          post({ type: "recording-started", mime: usedMime });
+          setStatus("Recording cabin locally…");
+        } catch (err) {
+          recording = false;
+          post({ type: "recording-error", message: (err && err.message) ? err.message : "Record start failed" });
+        }
+      };
+
+      window.__vmsStopLocalRecord = function () {
+        try {
+          if (!mediaRecorder || !recording) {
+            post({ type: "recording-error", message: "Not recording" });
+            return;
+          }
+          setStatus("Saving local recording…");
+          mediaRecorder.stop();
+        } catch (err) {
+          recording = false;
+          post({ type: "recording-error", message: (err && err.message) ? err.message : "Record stop failed" });
+        }
+      };
 
       start();
     })();

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
-import * as Haptics from "expo-haptics";
+import { Haptics, impactFeedback } from "@/utils/haptics";
 
 import { AppText } from "@/components/ui/AppText";
 import { useReduceMotion } from "@/hooks/useReduceMotion";
@@ -33,7 +33,7 @@ export function SosButton({ onPress }: { onPress: () => void }) {
         accessibilityLabel="Raise SOS"
         accessibilityRole="button"
         onPress={() => {
-          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          void impactFeedback(Haptics.ImpactFeedbackStyle.Heavy);
           onPress();
         }}
         style={({ pressed }) => [

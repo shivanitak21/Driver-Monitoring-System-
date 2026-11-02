@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Switch, TextInput, View } from "react-native";
 import { Settings } from "@/components/ui/icons";
 import { router } from "expo-router";
-import * as Haptics from "expo-haptics";
+import { selectionFeedback } from "@/utils/haptics";
 
 import { Page } from "@/components/layout/Page";
 import { ApiStatusBanner } from "@/components/system/ApiStatusBanner";
@@ -56,7 +56,7 @@ export function GuardiansScreen() {
           accessibilityLabel="Settings"
           accessibilityRole="button"
           onPress={() => {
-            void Haptics.selectionAsync();
+            void selectionFeedback();
             router.push("/settings");
           }}
           style={[styles.settings, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}
