@@ -25,8 +25,8 @@ export function SeatOccupancyGrid({ seats, awaitingWhenEmpty = false }: Props) {
         seat: {
           flexGrow: 1,
           flexBasis: "46%",
-          minHeight: 72,
-          borderRadius: 18,
+          minHeight: 76,
+          borderRadius: 16,
           paddingHorizontal: 14,
           paddingVertical: 12,
           justifyContent: "space-between",

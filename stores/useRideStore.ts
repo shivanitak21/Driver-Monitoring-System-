@@ -242,6 +242,8 @@ type RideState = {
   talkSession: TalkSession | null;
   activeRecording: GuardianRecording | null;
   recordings: GuardianRecording[];
+  /** Live videos captured on this phone. Not replaced by the server list. */
+  phoneClips: GuardianRecording[];
   snapshots: GuardianSnapshot[];
   fired: string[];
   alerts: SafetyAlert[];
@@ -295,6 +297,7 @@ type RideState = {
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<void>;
   refreshRecordings: () => Promise<void>;
+  addPhoneClip: (clip: GuardianRecording) => void;
   /** Server-side snap of live still (POST /snapshots). */
   takeSnapshot: (channel: MediaChannel) => Promise<GuardianSnapshot>;
   refreshSnapshots: () => Promise<void>;
@@ -368,6 +371,7 @@ export const useRideStore = create<RideState>()(
       talkSession: null,
       activeRecording: null,
       recordings: [],
+      phoneClips: [],
       snapshots: [],
       fired: [],
       alerts: liveMode ? [] : seededAlerts,
@@ -1031,6 +1035,9 @@ export const useRideStore = create<RideState>()(
           set({ connectionError: describeServiceError(error) });
           throw error;
         }
+      },
+      addPhoneClip: (clip) => {
+        set({ phoneClips: [clip, ...get().phoneClips.filter((item) => item.id !== clip.id)] });
       },
       takeSnapshot: async (channel) => {
         if (!services.api) throw new Error("API offline");

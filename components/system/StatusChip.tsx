@@ -8,27 +8,27 @@ type Tone = "ok" | "warn" | "danger" | "muted";
 export function StatusChip({ label, tone = "muted" }: { label: string; tone?: Tone }) {
   const { colors } = useTheme();
   const color =
+    tone === "ok" ? colors.signal : tone === "warn" ? colors.amber : tone === "danger" ? colors.danger : colors.inkMuted;
+  const background =
     tone === "ok"
-      ? colors.signal
+      ? colors.limeSoft
       : tone === "warn"
-        ? colors.amber
+        ? "rgba(230,177,90,0.16)"
         : tone === "danger"
-          ? colors.danger
-          : colors.inkMuted;
+          ? "rgba(255,59,48,0.12)"
+          : colors.bgRaised;
 
   return (
     <View
       style={{
         alignSelf: "flex-start",
         borderRadius: 999,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        backgroundColor: colors.bgRaised,
-        borderWidth: 1,
-        borderColor: colors.line,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        backgroundColor: background,
       }}
     >
-      <AppText variant="caption" style={{ color, textTransform: "capitalize" }}>
+      <AppText variant="caption" style={{ color, fontSize: 13 }}>
         {label}
       </AppText>
     </View>

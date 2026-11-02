@@ -22,14 +22,14 @@ export function buildLiveKitWatchHtml(options: {
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #0a0a0a; overflow: hidden; font-family: -apple-system, system-ui, sans-serif; }
     #stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
-    video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+    video { width: 100%; height: 100%; object-fit: cover; background: #000; }
     #tap {
       display: none; position: absolute; inset: 0; align-items: center; justify-content: center;
       background: rgba(0,0,0,0.45); color: #fff; font-size: 15px; font-weight: 600;
     }
     #status {
-      position: absolute; left: 10px; right: 10px; bottom: 10px;
-      padding: 8px 10px; border-radius: 10px;
+      position: absolute; left: 12px; bottom: 14px; max-width: 72%;
+      padding: 7px 12px; border-radius: 999px;
       background: rgba(0,0,0,0.55); color: #f5f5f7; font-size: 12px; line-height: 1.35;
       pointer-events: none;
     }
@@ -345,7 +345,7 @@ export function buildLiveKitWatchHtml(options: {
           }
           var stream = buildRecordStream();
           if (!stream) {
-            post({ type: "recording-error", message: "No live cabin tracks yet — wait for video, then Record" });
+            post({ type: "recording-error", message: "No live cabin video yet. Wait until the picture is moving, then Record." });
             return;
           }
           var mime = pickRecorderMime();

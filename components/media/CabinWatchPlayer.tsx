@@ -5,12 +5,20 @@ import { WebView } from "react-native-webview";
 import { AppText } from "@/components/ui/AppText";
 import { useTheme } from "@/providers/ThemeProvider";
 import { bustMediaUrl } from "@/services/api/media";
-import { saveBase64ToGallery } from "@/services/media/gallery";
+import { saveBase64File, saveBase64ToGallery } from "@/services/media/gallery";
 import { buildLiveKitWatchHtml } from "@/services/media/livekitWatchHtml";
 import type { LiveFrame, VideoSession } from "@/types/domain";
 
+function shortStatus(message: string) {
+  if (/requestPermissionsAsync|AndroidManifest|AUDIO permission|ExpoMediaLibrary/i.test(message)) {
+    return "Couldn’t save to Photos.";
+  }
+  return message.length > 90 ? `${message.slice(0, 87)}…` : message;
+}
+
 export type CabinWatchPlayerHandle = {
-  startLocalRecord: () => void;
+  /** Resolves once the live video track is actually recording. */
+  startLocalRecord: () => Promise<void>;
   stopLocalRecord: () => Promise<string>;
 };
 
@@ -20,12 +28,14 @@ type Props = {
   /** Shown under the player while LiveKit has no video yet. */
   fallbackFrame?: LiveFrame | null;
   height?: number;
+  /** Edge-to-edge picture. Hides the caption under the frame. */
+  broad?: boolean;
   onLocalRecordingChange?: (active: boolean) => void;
 };
 
 export const CabinWatchPlayer = forwardRef<CabinWatchPlayerHandle, Props>(
   function CabinWatchPlayer(
-    { session, listen, fallbackFrame, height = 280, onLocalRecordingChange },
+    { session, listen, fallbackFrame, height = 280, broad = false, onLocalRecordingChange },
     ref,
   ) {
     const { colors } = useTheme();
@@ -33,6 +43,12 @@ export const CabinWatchPlayer = forwardRef<CabinWatchPlayerHandle, Props>(
     const [status, setStatus] = useState("Connecting…");
     const [hasTrack, setHasTrack] = useState(false);
     const chunkBuf = useRef<{ total: number; parts: string[]; mime: string } | null>(null);
+    const startWaiters = useRef<
+      Array<{
+        resolve: () => void;
+        reject: (error: Error) => void;
+      }>
+    >([]);
     const stopWaiters = useRef<
       Array<{
         resolve: (uri: string) => void;
@@ -63,11 +79,23 @@ export const CabinWatchPlayer = forwardRef<CabinWatchPlayerHandle, Props>(
     };
 
     useImperativeHandle(ref, () => ({
-      startLocalRecord: () => {
-        webRef.current?.injectJavaScript(
-          "try{window.__vmsStartLocalRecord&&window.__vmsStartLocalRecord()}catch(e){};true;",
-        );
-      },
+      startLocalRecord: () =>
+        new Promise<void>((resolve, reject) => {
+          if (!webRef.current) {
+            reject(new Error("Live video isn’t open yet."));
+            return;
+          }
+          startWaiters.current.push({ resolve, reject });
+          webRef.current.injectJavaScript(
+            "try{window.__vmsStartLocalRecord&&window.__vmsStartLocalRecord()}catch(e){};true;",
+          );
+          setTimeout(() => {
+            const pending = startWaiters.current.find((waiter) => waiter.resolve === resolve);
+            if (!pending) return;
+            startWaiters.current = startWaiters.current.filter((waiter) => waiter.resolve !== resolve);
+            reject(new Error("Live video isn’t ready. Wait until the cabin picture is moving, then Record."));
+          }, 6000);
+        }),
       stopLocalRecord: () =>
         new Promise<string>((resolve, reject) => {
           stopWaiters.current.push({ resolve, reject });
@@ -76,7 +104,7 @@ export const CabinWatchPlayer = forwardRef<CabinWatchPlayerHandle, Props>(
           );
           setTimeout(() => {
             if (stopWaiters.current.length) {
-              rejectWaiters("Timed out saving local recording");
+              rejectWaiters("Timed out saving the live recording");
             }
           }, 45000);
         }),
@@ -87,7 +115,7 @@ export const CabinWatchPlayer = forwardRef<CabinWatchPlayerHandle, Props>(
         StyleSheet.create({
           wrap: {
             height,
-            borderRadius: 24,
+            borderRadius: broad ? 0 : 24,
             overflow: "hidden",
             backgroundColor: "#000",
           },
@@ -137,7 +165,7 @@ export const CabinWatchPlayer = forwardRef<CabinWatchPlayerHandle, Props>(
             gap: 8,
           },
         }),
-      [colors.amber, colors.bgSoft, hasTrack, height],
+      [broad, colors.amber, colors.bgSoft, hasTrack, height],
     );
 
     if (session.mode === "dummy") {
@@ -148,7 +176,7 @@ export const CabinWatchPlayer = forwardRef<CabinWatchPlayerHandle, Props>(
               <Image
                 source={{ uri: fallbackUri || `${session.previewUrl}?track=cabin` }}
                 style={styles.preview}
-                resizeMode="contain"
+                resizeMode="cover"
               />
             ) : (
               <View style={styles.fallback}>
@@ -185,7 +213,7 @@ export const CabinWatchPlayer = forwardRef<CabinWatchPlayerHandle, Props>(
       <View>
         <View style={styles.wrap}>
           {!hasTrack && fallbackUri ? (
-            <Image source={{ uri: fallbackUri }} style={styles.preview} resizeMode="contain" />
+            <Image source={{ uri: fallbackUri }} style={styles.preview} resizeMode="cover" />
           ) : null}
           <WebView
             ref={webRef}
@@ -215,9 +243,9 @@ export const CabinWatchPlayer = forwardRef<CabinWatchPlayerHandle, Props>(
                   mime?: string;
                 };
 
-                if (message.type === "status" && message.message) setStatus(message.message);
+                if (message.type === "status" && message.message) setStatus(shortStatus(message.message));
                 if (message.type === "track" && message.kind === "video") setHasTrack(true);
-                if (message.type === "error" && message.message) setStatus(message.message);
+                if (message.type === "error" && message.message) setStatus(shortStatus(message.message));
                 if (message.type === "connected") {
                   setStatus(
                     session.publisherOnline
@@ -234,7 +262,8 @@ export const CabinWatchPlayer = forwardRef<CabinWatchPlayerHandle, Props>(
 
                 if (message.type === "recording-started") {
                   onLocalRecordingChange?.(true);
-                  setStatus("Recording cabin on phone…");
+                  setStatus("Recording live video…");
+                  startWaiters.current.splice(0).forEach((waiter) => waiter.resolve());
                 }
                 if (message.type === "recording-begin") {
                   chunkBuf.current = {
@@ -255,26 +284,33 @@ export const CabinWatchPlayer = forwardRef<CabinWatchPlayerHandle, Props>(
                   const ext = mime.includes("mp4") ? "mp4" : "webm";
                   void (async () => {
                     try {
-                      if (!b64) throw new Error("Empty recording");
-                      const asset = await saveBase64ToGallery(
-                        b64,
-                        `vms-cabin-${Date.now()}.${ext}`,
-                        mime,
-                      );
-                      setStatus("Recording saved to Photos");
-                      stopWaiters.current.splice(0).forEach((waiter) => waiter.resolve(asset.uri));
+                      if (!b64) throw new Error("The live recording was empty.");
+                      const filename = `vms-cabin-${Date.now()}.${ext}`;
+                      const fileUri = await saveBase64File(b64, filename);
+                      try {
+                        await saveBase64ToGallery(b64, filename, mime);
+                      } catch {
+                        // The clip is already in app storage. Photos is optional.
+                      }
+                      setStatus("Live recording saved.");
+                      stopWaiters.current.splice(0).forEach((waiter) => waiter.resolve(fileUri));
                     } catch (error) {
                       const msg = error instanceof Error ? error.message : "Save failed";
-                      setStatus(msg);
+                      setStatus(shortStatus(msg));
                       rejectWaiters(msg);
                     }
                   })();
                 }
                 if (message.type === "recording-error") {
                   onLocalRecordingChange?.(false);
-                  const msg = message.message || "Recording failed";
+                  const msg = shortStatus(message.message || "Recording failed");
                   setStatus(msg);
-                  rejectWaiters(msg);
+                  if (startWaiters.current.length) {
+                    const err = new Error(msg);
+                    startWaiters.current.splice(0).forEach((waiter) => waiter.reject(err));
+                  } else {
+                    rejectWaiters(msg);
+                  }
                 }
               } catch {
                 // ignore
@@ -295,16 +331,18 @@ export const CabinWatchPlayer = forwardRef<CabinWatchPlayerHandle, Props>(
             </View>
           </View>
         </View>
-        <View style={styles.footer}>
-          <AppText variant="caption" numberOfLines={2} style={{ flex: 1 }}>
-            {status}
-          </AppText>
-          {!session.publisherOnline ? (
-            <AppText variant="caption" style={{ color: colors.amber }}>
-              publisher off
+        {broad ? null : (
+          <View style={styles.footer}>
+            <AppText variant="caption" numberOfLines={2} style={{ flex: 1 }}>
+              {status}
             </AppText>
-          ) : null}
-        </View>
+            {!session.publisherOnline ? (
+              <AppText variant="caption" style={{ color: colors.amber }}>
+                publisher off
+              </AppText>
+            ) : null}
+          </View>
+        )}
       </View>
     );
   },

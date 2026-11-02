@@ -1,10 +1,14 @@
-import { useMemo, useRef, useState, type ReactNode } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Image } from "expo-image";
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
+
 import { CabinTalkPublisher } from "@/components/media/CabinTalkPublisher";
 import {
   CabinWatchPlayer,
   type CabinWatchPlayerHandle,
 } from "@/components/media/CabinWatchPlayer";
+import { SnapShotFly, type FlyRect } from "@/components/media/SnapShotFly";
 import { AppText } from "@/components/ui/AppText";
 import { Camera, CircleDot, Ear, Mic, Video } from "@/components/ui/icons";
 import { ApiError } from "@/services/api/http";
@@ -12,78 +16,156 @@ import { bustMediaUrl } from "@/services/api/media";
 import { saveRemoteImageToGallery } from "@/services/media/gallery";
 import { ensureMicrophonePermission } from "@/services/media/micPermission";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useReduceMotion } from "@/hooks/useReduceMotion";
 import { useRideStore } from "@/stores/useRideStore";
-import type { MediaChannel } from "@/types/domain";
-import { selectionFeedback } from "@/utils/haptics";
+import type { GuardianRecording, MediaChannel } from "@/types/domain";
+import { friendlyActionError } from "@/utils/errors";
+import { notificationFeedback, selectionFeedback } from "@/utils/haptics";
 
 type Props = {
   channel: MediaChannel;
 };
 
+type Flight = { uri: string; from: FlyRect; to: FlyRect; token: number };
+
+type HostRef = {
+  measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) => void;
+};
+
+function measureWindow(node: HostRef): Promise<FlyRect> {
+  return new Promise((resolve, reject) => {
+    node.measureInWindow((x, y, width, height) => {
+      if (width <= 0 || height <= 0) reject(new Error("empty"));
+      else resolve({ x, y, width, height });
+    });
+  });
+}
+
 export function CabinMediaBar({ channel }: Props) {
   const { colors } = useTheme();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const broadHeight = Math.max(420, Math.round(screenHeight * 0.62));
+  const reduceMotion = useReduceMotion();
   const videoSession = useRideStore((state) => state.videoSession);
   const talkSession = useRideStore((state) => state.talkSession);
   const frameCms = useRideStore((state) => state.frameCms);
   const frameDms = useRideStore((state) => state.frameDms);
   const publisherOnline = useRideStore((state) => state.publisherOnline);
   const deviceState = useRideStore((state) => state.deviceState);
+  const snapshots = useRideStore((state) => state.snapshots);
   const startWatch = useRideStore((state) => state.startWatch);
   const stopWatch = useRideStore((state) => state.stopWatch);
   const startTalk = useRideStore((state) => state.startTalk);
   const stopTalk = useRideStore((state) => state.stopTalk);
-  const refreshFrames = useRideStore((state) => state.refreshFrames);
+  const startRecording = useRideStore((state) => state.startRecording);
+  const stopRecording = useRideStore((state) => state.stopRecording);
+  const addPhoneClip = useRideStore((state) => state.addPhoneClip);
+  const takeSnapshot = useRideStore((state) => state.takeSnapshot);
 
   const playerRef = useRef<CabinWatchPlayerHandle>(null);
+
+  const wrapRef = useRef<HostRef | null>(null);
+  const stageRef = useRef<HostRef | null>(null);
+  const boxRef = useRef<HostRef | null>(null);
+
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
-  const [localRecording, setLocalRecording] = useState(false);
+  const [liveRec, setLiveRec] = useState(false);
   const [speakBlocked, setSpeakBlocked] = useState<string | null>(null);
+  const [flight, setFlight] = useState<Flight | null>(null);
+  const [frozen, setFrozen] = useState(false);
+  const [frozenUri, setFrozenUri] = useState<string | null>(null);
+  const [pinned, setPinned] = useState<string | null>(null);
+  const revealUri = useRef<string | null>(null);
+
+  const boxScale = useSharedValue(1);
 
   const watching = Boolean(videoSession);
   const speaking = Boolean(talkSession);
+  const latest = snapshots[0]?.imageUrl ?? null;
+  const boxUri = pinned ?? (frozen ? frozenUri : latest);
+  const channelLabel = channel === "cms" ? "Cabin" : "Driver";
+
+  useEffect(() => {
+    if (pinned && latest === pinned) setPinned(null);
+  }, [latest, pinned]);
 
   const styles = useMemo(
     () =>
       StyleSheet.create({
-        wrap: { gap: 14 },
-        stage: { gap: 8 },
-        grid: {
-          flexDirection: "row",
-          flexWrap: "wrap",
-          gap: 10,
+        wrap: { gap: 16 },
+        stage: {
+          height: 220,
+          borderRadius: 22,
+          overflow: "hidden",
+          backgroundColor: "#0C0D10",
         },
-        item: {
-          width: "47.5%",
-          minHeight: 76,
-          borderRadius: 18,
+        idle: {
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+          gap: 6,
+          backgroundColor: colors.bgSoft,
+        },
+        row: {
+          flexDirection: "row",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+        },
+        control: {
+          flex: 1,
+          alignItems: "center",
+          gap: 6,
+        },
+        circle: {
+          width: 52,
+          height: 52,
+          borderRadius: 26,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.bgRaised,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.line,
-          backgroundColor: colors.bgRaised,
-          paddingHorizontal: 14,
-          paddingVertical: 12,
-          justifyContent: "space-between",
         },
-        itemOn: {
-          borderColor: colors.signal,
+        circleOn: {
           backgroundColor: colors.limeSoft,
+          borderColor: "transparent",
         },
-        itemSpeak: {
-          borderColor: colors.danger,
-          backgroundColor: colors.dangerSoft + "18",
+        circleDanger: {
+          backgroundColor: "rgba(255,59,48,0.14)",
+          borderColor: "transparent",
         },
-        itemTop: {
+        shelf: {
           flexDirection: "row",
           alignItems: "center",
-          justifyContent: "space-between",
+          gap: 12,
+          padding: 10,
+          borderRadius: 18,
+          backgroundColor: colors.bgRaised,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.line,
         },
-        hint: {
-          marginTop: -2,
+        box: {
+          width: 72,
+          height: 54,
+          borderRadius: 12,
+          overflow: "hidden",
+          backgroundColor: colors.bgSoft,
+          alignItems: "center",
+          justifyContent: "center",
         },
+        boxImage: { width: "100%", height: "100%" },
+        shelfText: { flex: 1, gap: 2 },
+        hint: { marginTop: -4 },
       }),
     [colors],
   );
+
+  const boxStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: boxScale.value }],
+  }));
 
   const run = async (key: string, work: () => Promise<void>) => {
     setBusy(key);
@@ -92,36 +174,67 @@ export function CabinMediaBar({ channel }: Props) {
       await work();
       void selectionFeedback();
     } catch (error) {
-      setNote(error instanceof Error ? error.message : "Action failed");
+      setNote(friendlyActionError(error));
     } finally {
       setBusy(null);
+    }
+  };
+
+  const releaseBox = () => {
+    setFrozen(false);
+    setFrozenUri(null);
+  };
+
+  const pulseBox = () => {
+    boxScale.value = withSequence(withTiming(1.06, { duration: 120 }), withSpring(1, { damping: 14, stiffness: 220 }));
+  };
+
+  const waitForPlayer = async () => {
+    const started = Date.now();
+    while (Date.now() - started < 8000) {
+      if (playerRef.current) return playerRef.current;
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+    throw new Error("Live video isn’t open yet.");
+  };
+
+  const finishLiveRecording = async () => {
+    try {
+      const uri = await playerRef.current?.stopLocalRecord();
+      if (uri) {
+        const now = Date.now();
+        const clip: GuardianRecording = {
+          id: `phone-${now}`,
+          rideId: useRideStore.getState().rideId,
+          guardianId: "",
+          status: "ready",
+          startedAt: now,
+          endedAt: now,
+          videoUrl: uri,
+          audio: true,
+        };
+        addPhoneClip(clip);
+      }
+      if (useRideStore.getState().activeRecording?.status === "recording") {
+        void stopRecording().catch(() => undefined);
+      }
+    } finally {
+      setLiveRec(false);
     }
   };
 
   const onWatch = () =>
     run("watch", async () => {
       if (watching) {
-        if (localRecording) {
-          try {
-            await playerRef.current?.stopLocalRecord();
-          } catch {
-            // still stop watch
-          }
-          setLocalRecording(false);
-        }
+        if (liveRec) await finishLiveRecording();
         await stopWatch();
         setListening(false);
-        setNote("Watch stopped. Stills keep updating.");
+        setNote("Watch off. Stills keep updating.");
         return;
       }
       await startWatch();
       const online = useRideStore.getState().publisherOnline;
-      const device = useRideStore.getState().deviceState;
-      setNote(
-        online
-          ? "Cabin LiveKit · tracks named cabin (video + mic)."
-          : `Watch started · vehicle ${device || "offline"} — waiting for cabin publisher.`,
-      );
+      setNote(online ? "Live cabin is on." : "Watch is on. Waiting for the car camera.");
     });
 
   const onListen = () =>
@@ -133,41 +246,68 @@ export function CabinMediaBar({ channel }: Props) {
       }
       if (!watching) await startWatch();
       setListening(true);
-      setNote("Listening to cabin microphone.");
+      setNote("Listening to the cabin.");
     });
 
   const onRecord = () =>
     run("record", async () => {
-      if (localRecording) {
-        const uri = await playerRef.current?.stopLocalRecord();
-        setLocalRecording(false);
-        setNote(uri ? "Recording saved to Photos on this phone." : "Recording stopped.");
+      if (liveRec) {
+        await finishLiveRecording();
+        setNote("Live recording saved.");
         return;
       }
-      if (!watching) await startWatch();
-      // Give LiveKit a moment to attach tracks after first Watch.
-      await new Promise((resolve) => setTimeout(resolve, watching ? 200 : 1200));
-      if (!playerRef.current) {
-        throw new Error("Open Watch first, wait for LIVE, then Record.");
-      }
-      setLocalRecording(true);
-      playerRef.current.startLocalRecord();
-      setNote("Recording cabin on this phone (not uploaded). Tap Stop rec when done.");
+      if (!useRideStore.getState().videoSession) await startWatch();
+      const player = await waitForPlayer();
+      await player.startLocalRecord();
+      setLiveRec(true);
+      void startRecording().catch(() => undefined);
+      setNote("Recording live video.");
     });
 
   const onSnap = () =>
     run("snap", async () => {
-      await refreshFrames();
-      const frame =
-        channel === "cms" ? useRideStore.getState().frameCms : useRideStore.getState().frameDms;
-      if (!frame?.imageUrl) throw new Error("No live still yet — wait for frames, then Snap.");
-      await saveRemoteImageToGallery(
-        bustMediaUrl(frame.imageUrl, Date.now()),
-        `vms-${channel}-${Date.now()}.jpg`,
-      );
-      setNote(
-        `Snap saved to Photos (${channel === "cms" ? "cabin" : "driver"}). Not uploaded to the server.`,
-      );
+      const frame = channel === "cms" ? useRideStore.getState().frameCms : useRideStore.getState().frameDms;
+      const preview = frame?.imageUrl ? bustMediaUrl(frame.imageUrl, Date.now()) : latest;
+      setFrozen(true);
+      setFrozenUri(latest);
+      let flying = false;
+
+      if (!reduceMotion && preview && wrapRef.current && stageRef.current && boxRef.current) {
+        try {
+          const [wrapBox, from, to] = await Promise.all([
+            measureWindow(wrapRef.current),
+            measureWindow(stageRef.current),
+            measureWindow(boxRef.current),
+          ]);
+          setFlight({
+            uri: preview,
+            token: Date.now(),
+            from: { x: from.x - wrapBox.x, y: from.y - wrapBox.y, width: from.width, height: from.height },
+            to: { x: to.x - wrapBox.x, y: to.y - wrapBox.y, width: to.width, height: to.height },
+          });
+          flying = true;
+        } catch {
+          // The snap still saves if the preview cannot be measured.
+        }
+      }
+
+      try {
+        const snap = await takeSnapshot(channel);
+        revealUri.current = snap.imageUrl;
+        void saveRemoteImageToGallery(snap.imageUrl, `vms-${snap.channel}-${snap.id}.jpg`).catch(() => undefined);
+        setNote(`Saved · ${channelLabel}`);
+        void notificationFeedback();
+        if (!flying) {
+          releaseBox();
+          setPinned(snap.imageUrl);
+          pulseBox();
+        }
+      } catch (error) {
+        setFlight(null);
+        revealUri.current = null;
+        releaseBox();
+        throw error;
+      }
     });
 
   const onSpeak = () =>
@@ -182,185 +322,220 @@ export function CabinMediaBar({ channel }: Props) {
         await ensureMicrophonePermission();
         await startTalk();
         setSpeakBlocked(null);
-        setNote("Speak ready — tap the red bar once to start the cabin mic.");
+        setNote("Tap the red bar once to speak into the cabin.");
       } catch (error) {
         if (error instanceof ApiError && error.status === 404) {
-          const msg = "Speak endpoint missing (404).";
+          const msg = "Speak isn’t available on this server yet.";
           setSpeakBlocked(msg);
           throw new Error(msg);
         }
         if (error instanceof ApiError && error.status === 409) {
-          const msg = "Speak needs LiveKit mode on the server (409).";
+          const msg = "Speak needs the live video service.";
           setSpeakBlocked(msg);
           throw new Error(msg);
         }
         if (error instanceof ApiError && error.status === 403) {
-          throw new Error("Sharing is off — Speak is blocked.");
+          throw new Error("Sharing is off, so Speak is blocked.");
         }
         throw error;
       }
     });
 
+  const offline = !publisherOnline || deviceState === "offline";
+
   return (
-    <View style={styles.wrap}>
-      {watching && videoSession ? (
-        <View style={styles.stage}>
+    <View
+      ref={(node) => {
+        wrapRef.current = node as HostRef | null;
+      }}
+      style={styles.wrap}
+      collapsable={false}
+    >
+      <View
+        ref={(node) => {
+          stageRef.current = node as HostRef | null;
+        }}
+        collapsable={false}
+        style={watching ? { marginHorizontal: -20, width: screenWidth } : undefined}
+      >
+        {watching && videoSession ? (
           <CabinWatchPlayer
             ref={playerRef}
             session={videoSession}
             listen={listening}
             fallbackFrame={frameCms ?? frameDms}
-            onLocalRecordingChange={setLocalRecording}
+            height={broadHeight}
+            broad
+            onLocalRecordingChange={setLiveRec}
           />
-          {!publisherOnline || deviceState === "offline" ? (
-            <AppText variant="caption" style={{ color: colors.amber }}>
-              Device {deviceState || "unknown"} · publisher {publisherOnline ? "on" : "off"}. Local Record
-              needs LIVE cabin video.
+        ) : (
+          <View style={[styles.stage, styles.idle]}>
+            <AppText variant="strong">Cabin</AppText>
+            <AppText variant="caption" style={{ textAlign: "center" }}>
+              Tap Watch for live video. Snap saves the current still.
             </AppText>
-          ) : null}
-        </View>
-      ) : (
-        <View
-          style={{
-            height: 180,
-            borderRadius: 24,
-            backgroundColor: colors.bgSoft,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: colors.line,
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-            gap: 6,
-          }}
-        >
-          <AppText variant="strong">Cabin stream</AppText>
-          <AppText variant="caption" style={{ textAlign: "center" }}>
-            Tap Watch for live video. Snap saves stills to Photos. Record saves cabin video on this phone.
-          </AppText>
-        </View>
-      )}
+          </View>
+        )}
+      </View>
 
-      <View style={styles.grid}>
-        <MediaTile
-          title={watching ? "Stop" : "Watch"}
-          subtitle="Live cabin"
+      {watching && offline ? (
+        <AppText variant="caption" style={{ color: colors.amber }}>
+          Car camera is offline. Live video starts when it connects.
+        </AppText>
+      ) : null}
+
+      <View style={styles.row}>
+        <Control
+          label={watching ? "Stop" : "Watch"}
           busy={busy === "watch"}
           active={watching}
-          styles={styles}
           colors={colors}
+          styles={styles}
           onPress={onWatch}
           icon={<Video size={20} color={watching ? colors.signal : colors.ink} strokeWidth={1.75} />}
         />
-        <MediaTile
-          title={listening ? "Mute" : "Listen"}
-          subtitle="Cabin mic"
+        <Control
+          label={listening ? "Mute" : "Listen"}
           busy={busy === "listen"}
           active={listening}
-          styles={styles}
           colors={colors}
+          styles={styles}
           onPress={onListen}
           icon={<Ear size={20} color={listening ? colors.signal : colors.ink} strokeWidth={1.75} />}
         />
-        <MediaTile
-          title={localRecording ? "Stop rec" : "Record"}
-          subtitle={localRecording ? "Saving to Photos…" : "On this phone"}
+        <Control
+          label={liveRec ? "Stop" : "Record"}
           busy={busy === "record"}
-          active={localRecording}
-          styles={styles}
+          active={liveRec}
+          danger
           colors={colors}
+          styles={styles}
           onPress={onRecord}
-          icon={<CircleDot size={20} color={localRecording ? colors.danger : colors.ink} strokeWidth={1.75} />}
+          icon={<CircleDot size={20} color={liveRec ? colors.danger : colors.ink} strokeWidth={1.75} />}
         />
-        <MediaTile
-          title="Snap"
-          subtitle="To Photos"
+        <Control
+          label="Snap"
           busy={busy === "snap"}
           active={false}
-          styles={styles}
           colors={colors}
+          styles={styles}
           onPress={onSnap}
           icon={<Camera size={20} color={colors.ink} strokeWidth={1.75} />}
         />
-        <MediaTile
-          title={speaking ? "End speak" : "Speak"}
-          subtitle={speakBlocked ? "Needs API deploy" : "Phone mic → cabin speaker"}
+        <Control
+          label={speaking ? "End" : "Speak"}
           busy={busy === "speak"}
           active={speaking}
-          speak
-          wide
-          styles={styles}
+          danger
           colors={colors}
+          styles={styles}
           onPress={onSpeak}
           icon={<Mic size={20} color={speaking ? colors.danger : colors.ink} strokeWidth={1.75} />}
         />
       </View>
 
+      <View style={styles.shelf}>
+        <View
+          ref={(node) => {
+            boxRef.current = node as HostRef | null;
+          }}
+          style={styles.box}
+          collapsable={false}
+        >
+          <Animated.View style={[StyleSheet.absoluteFill, boxStyle]}>
+            {boxUri ? (
+              <Image source={{ uri: boxUri }} style={styles.boxImage} contentFit="cover" />
+            ) : (
+              <View style={styles.box}>
+                <Camera size={18} color={colors.inkFaint} strokeWidth={1.75} />
+              </View>
+            )}
+          </Animated.View>
+        </View>
+        <View style={styles.shelfText}>
+          <AppText variant="strong" style={{ fontSize: 15 }}>
+            {boxUri ? "Latest snap" : "Snaps"}
+          </AppText>
+          <AppText variant="caption" numberOfLines={2}>
+            {boxUri
+              ? `${snapshots[0]?.channel === "cms" ? "Cabin" : "Driver"} still`
+              : `Snap saves the ${channelLabel.toLowerCase()} still here.`}
+          </AppText>
+        </View>
+      </View>
+
       {speaking && talkSession ? <CabinTalkPublisher session={talkSession} /> : null}
 
       {speakBlocked && !note ? (
-        <AppText variant="caption" style={[styles.hint, { color: colors.amber }]}>
+        <AppText variant="caption" style={[styles.hint, { color: colors.amber }]} numberOfLines={2}>
           {speakBlocked}
         </AppText>
       ) : null}
 
       {note ? (
-        <AppText variant="caption" style={styles.hint}>
+        <AppText variant="caption" style={styles.hint} numberOfLines={2}>
           {note}
         </AppText>
+      ) : null}
+
+      {flight ? (
+        <SnapShotFly
+          key={flight.token}
+          uri={flight.uri}
+          from={flight.from}
+          to={flight.to}
+          onDone={() => {
+            const next = revealUri.current;
+            revealUri.current = null;
+            setFlight(null);
+            releaseBox();
+            if (next) setPinned(next);
+            pulseBox();
+          }}
+        />
       ) : null}
     </View>
   );
 }
 
-function MediaTile({
-  title,
-  subtitle,
+function Control({
+  label,
   icon,
   onPress,
   busy,
   active,
-  speak,
-  wide,
+  danger,
   styles,
   colors,
 }: {
-  title: string;
-  subtitle: string;
+  label: string;
   icon: ReactNode;
   onPress: () => void;
   busy: boolean;
   active: boolean;
-  speak?: boolean;
-  wide?: boolean;
+  danger?: boolean;
   styles: {
-    item: object;
-    itemOn: object;
-    itemSpeak: object;
-    itemTop: object;
+    control: object;
+    circle: object;
+    circleOn: object;
+    circleDanger: object;
   };
   colors: { ink: string };
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={label}
       onPress={onPress}
       disabled={busy}
-      style={[
-        styles.item,
-        wide && { width: "100%" },
-        active && !speak && styles.itemOn,
-        active && speak && styles.itemSpeak,
-        busy && { opacity: 0.55 },
-      ]}
+      style={({ pressed }) => [styles.control, pressed && !busy && { opacity: 0.72 }, busy && { opacity: 0.55 }]}
     >
-      <View style={styles.itemTop}>
+      <View style={[styles.circle, active && !danger && styles.circleOn, active && danger && styles.circleDanger]}>
         {busy ? <ActivityIndicator color={colors.ink} /> : icon}
       </View>
-      <View>
-        <AppText variant="strong">{title}</AppText>
-        <AppText variant="caption">{subtitle}</AppText>
-      </View>
+      <AppText variant="caption" numberOfLines={1} style={{ fontSize: 12 }}>
+        {label}
+      </AppText>
     </Pressable>
   );
 }

@@ -79,9 +79,7 @@ export function LiveStill({
         <View style={styles.empty}>
           <AppText variant="strong">{label}</AppText>
           <AppText variant="caption">
-            {failed
-              ? "Image failed to load — check HTTP cleartext / network."
-              : "Waiting for GET /frames/live …"}
+            {failed ? "Couldn’t load this still." : "Waiting for the car camera."}
           </AppText>
         </View>
       )}

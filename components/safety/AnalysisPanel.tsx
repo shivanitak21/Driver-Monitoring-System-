@@ -20,7 +20,7 @@ const LABELS: Record<string, string> = {
 
 function formatValue(value: unknown): string {
   if (value == null) return "—";
-  if (typeof value === "boolean") return value ? "yes" : "no";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
   if (typeof value === "number" || typeof value === "string") return String(value);
   if (typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>);
@@ -33,7 +33,7 @@ function formatValue(value: unknown): string {
 export function AnalysisPanel({
   title,
   side,
-  emptyLabel = "Waiting for analysis…",
+  emptyLabel = "Waiting for a reading",
 }: {
   title: string;
   side: AnalysisSide | null | undefined;
@@ -43,53 +43,72 @@ export function AnalysisPanel({
   const styles = useMemo(
     () =>
       StyleSheet.create({
+        section: { gap: 8 },
         card: {
           borderRadius: 18,
-          borderWidth: 1,
-          borderColor: colors.line,
           backgroundColor: colors.bgRaised,
-          padding: 14,
-          gap: 8,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.line,
+          overflow: "hidden",
         },
-        obsRow: {
+        row: {
           flexDirection: "row",
           justifyContent: "space-between",
+          alignItems: "center",
           gap: 12,
+          paddingHorizontal: 14,
+          paddingVertical: 11,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.line,
         },
+        rowFirst: { borderTopWidth: 0 },
+        empty: { paddingHorizontal: 14, paddingVertical: 14 },
       }),
     [colors],
   );
 
-  if (!side) {
-    return (
-      <View style={styles.card}>
-        <AppText variant="strong">{title}</AppText>
-        <AppText variant="caption">{emptyLabel}</AppText>
-      </View>
-    );
-  }
-
-  const scene = side.scene && side.scene !== "short" ? side.scene : null;
-  const observations = Object.entries(side.observations || {}).slice(0, 6);
+  const scene = side?.scene && side.scene !== "short" ? side.scene : null;
+  const observations = Object.entries(side?.observations || {}).slice(0, 6);
+  const summary = side ? (side.hazards.length ? side.hazards.join(", ") : "No hazards") : emptyLabel;
 
   return (
-    <View style={styles.card}>
-      <AppText variant="strong">{title}</AppText>
-      {scene ? <AppText variant="body">{scene}</AppText> : null}
-      <AppText variant="caption">
-        {side.hazards.length ? side.hazards.join(", ") : "No hazards"}
-        {side.at ? ` · ${clock(side.at)}` : ""}
+    <View style={styles.section}>
+      <AppText variant="caption" style={{ paddingHorizontal: 4 }}>
+        {title}
       </AppText>
-      {observations.map(([key, value]) => (
-        <View key={key} style={styles.obsRow}>
-          <AppText variant="caption" style={{ color: colors.inkMuted, flex: 1 }}>
-            {LABELS[key] || key}
-          </AppText>
-          <AppText variant="caption" style={{ flex: 1.2, textAlign: "right" }}>
-            {formatValue(value)}
-          </AppText>
-        </View>
-      ))}
+      <View style={styles.card}>
+        {!side ? (
+          <View style={styles.empty}>
+            <AppText variant="caption">{emptyLabel}</AppText>
+          </View>
+        ) : (
+          <>
+            <View style={[styles.row, styles.rowFirst]}>
+              <AppText variant="strong" style={{ fontSize: 15, flex: 1 }} numberOfLines={2}>
+                {summary}
+              </AppText>
+              {side.at ? <AppText variant="caption">{clock(side.at)}</AppText> : null}
+            </View>
+            {scene ? (
+              <View style={styles.row}>
+                <AppText variant="caption" style={{ flex: 1 }}>
+                  {scene}
+                </AppText>
+              </View>
+            ) : null}
+            {observations.map(([key, value]) => (
+              <View key={key} style={styles.row}>
+                <AppText variant="caption" style={{ color: colors.inkMuted, flex: 1 }}>
+                  {LABELS[key] || key}
+                </AppText>
+                <AppText variant="caption" style={{ flex: 1, textAlign: "right", color: colors.ink }}>
+                  {formatValue(value)}
+                </AppText>
+              </View>
+            ))}
+          </>
+        )}
+      </View>
     </View>
   );
 }

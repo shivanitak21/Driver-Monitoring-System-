@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { router } from "expo-router";
 
 import { Page } from "@/components/layout/Page";
 import { CabinLibrary } from "@/components/media/CabinLibrary";
@@ -11,6 +12,7 @@ import { ApiStatusBanner } from "@/components/system/ApiStatusBanner";
 import { StatusChip } from "@/components/system/StatusChip";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
+import { Settings } from "@/components/ui/icons";
 import { ScreenState } from "@/components/ui/ScreenState";
 import { Segmented } from "@/components/ui/Segmented";
 import { driverStateLabel } from "@/constants/liveMap";
@@ -19,6 +21,7 @@ import { useTheme } from "@/providers/ThemeProvider";
 import { services } from "@/services/createServices";
 import { useRideStore } from "@/stores/useRideStore";
 import type { MediaChannel } from "@/types/domain";
+import { selectionFeedback } from "@/utils/haptics";
 
 type Phase = "idle" | "loading" | "live" | "error";
 type CameraTab = "both" | "cms" | "dms";
@@ -40,6 +43,7 @@ export function CabinScreen() {
   const frameDms = useRideStore((state) => state.frameDms);
   const frameCms = useRideStore((state) => state.frameCms);
   const recordings = useRideStore((state) => state.recordings);
+  const phoneClips = useRideStore((state) => state.phoneClips);
   const snapshots = useRideStore((state) => state.snapshots);
   const guardians = useRideStore((state) => state.guardians);
   const liveMode = useRideStore((state) => state.liveMode);
@@ -117,7 +121,7 @@ export function CabinScreen() {
   }, [consent, liveMode, phase, refreshAnalysis, refreshFrames]);
 
   const attentive = driverState === "attentive";
-  const snapChannel: MediaChannel = camera === "cms" ? "cms" : "dms";
+  const snapChannel: MediaChannel = camera === "dms" ? "dms" : "cms";
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -126,7 +130,17 @@ export function CabinScreen() {
         chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
         dual: { gap: 12 },
         section: { gap: 12 },
-        sectionHead: { gap: 4 },
+        sectionHead: { gap: 4, paddingHorizontal: 4 },
+        settings: {
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.bgRaised,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.line,
+        },
       }),
     [colors],
   );
@@ -145,9 +159,22 @@ export function CabinScreen() {
   return (
     <Page
       title="Cabin"
-      subtitle={liveMode ? `${passengerName || rideId}` : "Interior view"}
+      subtitle={liveMode ? passengerName || rideId : "Interior view"}
       refreshing={refreshing}
       onRefresh={liveMode ? onRefresh : undefined}
+      action={
+        <Pressable
+          accessibilityLabel="Settings"
+          accessibilityRole="button"
+          onPress={() => {
+            void selectionFeedback();
+            router.push("/settings");
+          }}
+          style={styles.settings}
+        >
+          <Settings size={18} color={colors.ink} strokeWidth={1.75} />
+        </Pressable>
+      }
     >
       <View style={{ marginBottom: 10 }}>
         <ApiStatusBanner onRetry={() => void refreshAll()} />
@@ -183,7 +210,7 @@ export function CabinScreen() {
           <View style={styles.heroMeta}>
             <AppText variant="caption">
               {deviceId}
-              {deviceState ? ` · ${deviceState}` : ""}
+              {deviceState ? ` · ${deviceState === "online" ? "Online" : "Offline"}` : ""}
             </AppText>
             <View style={styles.chips}>
               <StatusChip label={driverStateLabel(driverState)} tone={attentive ? "ok" : "danger"} />
@@ -198,18 +225,19 @@ export function CabinScreen() {
             <>
               <View style={styles.section}>
                 <View style={styles.sectionHead}>
-                  <AppText variant="strong">Live</AppText>
-                  <AppText variant="caption">
-                    One cabin picture (driver + passenger) and cabin mic over LiveKit.
-                  </AppText>
+                  <AppText variant="caption">Live</AppText>
                 </View>
                 <CabinMediaBar channel={snapChannel} />
               </View>
 
+              <CabinLibrary recordings={[...phoneClips, ...recordings]} snapshots={snapshots} />
+              {guardians.length === 0 ? (
+                <AppText variant="caption">Add someone in Family before Snap or Record.</AppText>
+              ) : null}
+
               <View style={styles.section}>
                 <View style={styles.sectionHead}>
-                  <AppText variant="strong">Stills</AppText>
-                  <AppText variant="caption">JPEG polls — not the Watch stream.</AppText>
+                  <AppText variant="caption">Stills</AppText>
                 </View>
                 <Segmented
                   value={camera}
@@ -241,20 +269,15 @@ export function CabinScreen() {
               {(camera === "both" || camera === "cms") && (
                 <AnalysisPanel title="Cabin" side={analysis?.cms} />
               )}
-
-              <CabinLibrary recordings={recordings} snapshots={snapshots} />
-              {guardians.length === 0 ? (
-                <AppText variant="caption" style={{ color: colors.amber }}>
-                  No guardians loaded — Snap/Record need a guardianId (e.g. g-priya). Open Family or pull to refresh.
-                </AppText>
-              ) : null}
             </>
           ) : (
             <ScreenState kind="empty" title="Offline demo" body="Set EXPO_PUBLIC_TELEMETRY_URL for live cabin." />
           )}
 
           <View style={styles.section}>
-            <AppText variant="strong">Seats</AppText>
+            <AppText variant="caption" style={{ paddingHorizontal: 4 }}>
+              Seats
+            </AppText>
             <SeatOccupancyGrid seats={seats} awaitingWhenEmpty={liveMode} />
           </View>
 

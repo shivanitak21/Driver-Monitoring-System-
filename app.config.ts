@@ -21,6 +21,15 @@ const plugins: ExpoConfig["plugins"] = [
       recordAudioAndroid: true,
     },
   ],
+  [
+    "expo-media-library",
+    {
+      photosPermission: "VMS saves cabin snaps to your photo library.",
+      savePhotosPermission: "VMS saves cabin snaps to your photo library.",
+      // Photo only. Asking for audio rejects on Android because it is not in the manifest.
+      granularPermissions: ["photo"],
+    },
+  ],
 ];
 
 if (mapsKey) {
