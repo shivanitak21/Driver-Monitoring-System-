@@ -115,6 +115,8 @@ export type RiskSeverity = "none" | "low" | "medium" | "high" | "critical";
 
 export type AnalysisSide = {
   scene: string;
+  /** Full sentence from the car. Live payloads put this here and leave `scene` as "short". */
+  description: string;
   hazards: string[];
   confidence: number;
   suppressed: string[];

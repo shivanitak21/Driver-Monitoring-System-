@@ -67,9 +67,11 @@ export function AnalysisPanel({
     [colors],
   );
 
-  const scene = side?.scene && side.scene !== "short" ? side.scene : null;
-  const observations = Object.entries(side?.observations || {}).slice(0, 6);
-  const summary = side ? (side.hazards.length ? side.hazards.join(", ") : "No hazards") : emptyLabel;
+  const scene =
+    side?.description?.trim() ||
+    (side?.scene?.trim() && side.scene.trim().toLowerCase() !== "short" ? side.scene.trim() : null);
+  const observations = Object.entries(side?.observations || {}).slice(0, 8);
+  const confidence = side && Number.isFinite(side.confidence) ? `${Math.round(side.confidence * 100)}%` : null;
 
   return (
     <View style={styles.section}>
@@ -84,15 +86,34 @@ export function AnalysisPanel({
         ) : (
           <>
             <View style={[styles.row, styles.rowFirst]}>
-              <AppText variant="strong" style={{ fontSize: 15, flex: 1 }} numberOfLines={2}>
-                {summary}
+              <AppText variant="strong" style={{ fontSize: 15, flex: 1 }}>
+                {scene || "No scene text in this reading"}
               </AppText>
               {side.at ? <AppText variant="caption">{clock(side.at)}</AppText> : null}
             </View>
-            {scene ? (
+            {confidence ? (
               <View style={styles.row}>
-                <AppText variant="caption" style={{ flex: 1 }}>
-                  {scene}
+                <AppText variant="caption" style={{ color: colors.inkMuted }}>
+                  Confidence
+                </AppText>
+                <AppText variant="caption">{confidence}</AppText>
+              </View>
+            ) : null}
+            <View style={styles.row}>
+              <AppText variant="caption" style={{ color: colors.inkMuted, flex: 1 }}>
+                Hazards
+              </AppText>
+              <AppText variant="caption" style={{ flex: 1, textAlign: "right" }}>
+                {side.hazards.length ? side.hazards.join(", ") : "None reported"}
+              </AppText>
+            </View>
+            {side.suppressed.length > 0 ? (
+              <View style={styles.row}>
+                <AppText variant="caption" style={{ color: colors.inkMuted, flex: 1 }}>
+                  Suppressed
+                </AppText>
+                <AppText variant="caption" style={{ flex: 1, textAlign: "right" }}>
+                  {side.suppressed.join(", ")}
                 </AppText>
               </View>
             ) : null}

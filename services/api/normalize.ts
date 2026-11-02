@@ -98,11 +98,25 @@ function normalizeLatLng(
   return { latitude, longitude };
 }
 
+function readLatLng(raw: unknown): Coordinate | null {
+  if (!raw || typeof raw !== "object") return null;
+  const point = raw as {
+    latitude?: unknown;
+    longitude?: unknown;
+    lat?: unknown;
+    lng?: unknown;
+    lon?: unknown;
+  };
+  const latitude = asNumber(point.latitude ?? point.lat);
+  const longitude = asNumber(point.longitude ?? point.lng ?? point.lon);
+  if (latitude == null || longitude == null) return null;
+  if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+  return { latitude, longitude };
+}
+
 function normalizeRoute(raw: unknown): Coordinate[] {
   if (!Array.isArray(raw)) return [];
-  return raw
-    .map((point) => normalizeLatLng(point as { latitude?: unknown; longitude?: unknown }))
-    .filter((point): point is Coordinate => Boolean(point));
+  return raw.map((point) => readLatLng(point)).filter((point): point is Coordinate => Boolean(point));
 }
 
 export function normalizeRide(raw: Partial<RideDto> | null | undefined): RideDto | null {
@@ -121,12 +135,7 @@ export function normalizeRide(raw: Partial<RideDto> | null | undefined): RideDto
     heading: asNumber(raw.heading),
     score: asNumber(raw.score, 98) ?? 98,
     shareLink: asString(raw.shareLink, `vms://trip/${id}`),
-    position: raw.position
-      ? {
-          latitude: asNumber(raw.position.latitude),
-          longitude: asNumber(raw.position.longitude),
-        }
-      : null,
+    position: readLatLng(raw.position) ?? readLatLng(raw),
     seats: normalizeSeats(raw.seats),
     updatedAt: asString(raw.updatedAt),
     publisherOnline: asBoolean(raw.publisherOnline, false),
@@ -159,7 +168,10 @@ export function normalizeAlert(raw: Partial<AlertDto> | null | undefined): Safet
     channel,
     orinType: raw.orinType ? asString(raw.orinType) : undefined,
     confidence: asNumber(raw.confidence),
-    clipId: raw.clipId ? asString(raw.clipId) : null,
+    clipId: (() => {
+      const id = raw.clipId ? asString(raw.clipId).trim() : "";
+      return id && id.toLowerCase() !== "null" ? id : null;
+    })(),
   };
 }
 
@@ -250,11 +262,12 @@ export function normalizeHistoryRides(raw: unknown): HistoryRide[] {
     .filter((ride): ride is HistoryRide => Boolean(ride));
 }
 
-function normalizeAnalysisSide(raw: unknown): AnalysisSide | null {
+export function normalizeAnalysisSide(raw: unknown): AnalysisSide | null {
   if (!raw || typeof raw !== "object") return null;
   const side = raw as Partial<AnalysisSide>;
   return {
     scene: asString(side.scene),
+    description: asString(side.description),
     hazards: Array.isArray(side.hazards) ? side.hazards.map((item) => String(item)) : [],
     confidence: asNumber(side.confidence, 0) ?? 0,
     suppressed: Array.isArray(side.suppressed) ? side.suppressed.map((item) => String(item)) : [],

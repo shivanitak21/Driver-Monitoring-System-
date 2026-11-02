@@ -29,6 +29,7 @@ import { routeLine, shiftLine } from "@/data/route";
 import { useLiveApiRefresh } from "@/hooks/useLiveApiRefresh";
 import { useTheme } from "@/providers/ThemeProvider";
 import { rideMeta, tripHeadline, useRideStore, useSafetyIndex } from "@/stores/useRideStore";
+import { hasAlertClip } from "@/utils/alerts";
 
 export function LiveMapScreen() {
   useLiveApiRefresh("all");
@@ -49,8 +50,10 @@ export function LiveMapScreen() {
   const rideStatus = useRideStore((state) => state.rideStatus);
   const driverState = useRideStore((state) => state.driverState);
   const position = useRideStore((state) => state.position);
+  const positionFromApi = useRideStore((state) => state.positionFromApi);
   const heading = useRideStore((state) => state.heading);
   const trail = useRideStore((state) => state.trail);
+  const apiRoute = useRideStore((state) => state.route);
   const follow = useRideStore((state) => state.follow);
   const setFollow = useRideStore((state) => state.setFollow);
   const speed = useRideStore((state) => state.speedKmh);
@@ -77,12 +80,19 @@ export function LiveMapScreen() {
       }
     : tripHeadline(leg, Boolean(routeShift));
   const simulatedRoute = useMemo(() => shiftLine(routeLine, routeShift), [routeShift]);
-  const liveGeo = useMemo(() => liveMapGeometry(position, trail), [position, trail]);
+  const mapPosition = !liveMode || positionFromApi ? position : null;
+  const liveGeo = useMemo(
+    () =>
+      mapPosition
+        ? liveMapGeometry(mapPosition, apiRoute.length > 0 ? apiRoute : positionFromApi ? trail : [])
+        : { route: [], trail: [] },
+    [apiRoute, mapPosition, positionFromApi, trail],
+  );
   const route = liveMode ? liveGeo.route : simulatedRoute;
   const mapTrail = liveMode ? liveGeo.trail : trail;
   const origin = liveMode ? null : simulatedRoute[0];
   const destination = liveMode ? null : simulatedRoute[simulatedRoute.length - 1];
-  const openAlerts = alerts.filter((alert) => !alert.acknowledged);
+  const openAlerts = alerts.filter((alert) => !alert.acknowledged && (!liveMode || hasAlertClip(alert)));
   const retry = () => {
     void (connection === "error" ? bootstrapLive() : refreshAll());
   };
@@ -188,18 +198,20 @@ export function LiveMapScreen() {
     <View style={styles.fill}>
       <View style={styles.mapHost}>
         <MapErrorBoundary>
-          <RideMap
-            route={route}
-            trail={mapTrail}
-            position={position}
-            heading={heading}
-            destination={destination}
-            origin={origin}
-            follow={follow}
-            deviceFix={deviceFix}
-            onPan={() => setFollow(false)}
-            onPressVehicle={openVehicle}
-          />
+          {mapPosition ? (
+            <RideMap
+              route={route}
+              trail={mapTrail}
+              position={mapPosition}
+              heading={heading}
+              destination={destination}
+              origin={origin}
+              follow={follow}
+              deviceFix={liveMode ? null : deviceFix}
+              onPan={() => setFollow(false)}
+              onPressVehicle={openVehicle}
+            />
+          ) : null}
         </MapErrorBoundary>
 
         {alertsOpen ? (

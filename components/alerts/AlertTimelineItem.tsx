@@ -4,6 +4,7 @@ import { AppText } from "@/components/ui/AppText";
 import { statusColor } from "@/components/ui/ScoreRing";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { SafetyAlert } from "@/types/domain";
+import { alertDescription, cameraLabel } from "@/utils/alerts";
 
 type Props = {
   alert: SafetyAlert;
@@ -24,7 +25,19 @@ export function AlertTimelineItem({ alert, timeLabel, showLine, onAcknowledge, o
         : "safe",
   );
 
-  const channelLabel = alert.channel === "cms" ? "Cabin" : alert.channel === "dms" ? "Driver" : null;
+  const channel = cameraLabel(alert.channel);
+  const description = alertDescription(alert);
+  const meta = [
+    alert.severity,
+    alert.kind.replace(/_/g, " "),
+    channel,
+    alert.origin,
+    alert.confidence != null ? `${Math.round(alert.confidence * 100)}%` : null,
+    alert.clipId ? `clip ${alert.clipId}` : null,
+    alert.acknowledged ? "acknowledged" : "open",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <View style={{ flexDirection: "row", gap: 12 }} testID={`alert-${alert.kind}`}>
@@ -39,10 +52,11 @@ export function AlertTimelineItem({ alert, timeLabel, showLine, onAcknowledge, o
           </AppText>
           <AppText variant="caption">{timeLabel}</AppText>
         </View>
-        <AppText variant="caption" numberOfLines={2}>
-          {alert.detail}
-          {channelLabel ? ` · ${channelLabel}` : ""}
-        </AppText>
+        <AppText variant="caption">{description}</AppText>
+        <AppText variant="caption">{meta}</AppText>
+        {alert.detail?.trim() && alert.locationLabel?.trim() ? (
+          <AppText variant="caption">{alert.locationLabel}</AppText>
+        ) : null}
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
           {onEvidence ? (
             <Pressable onPress={onEvidence} accessibilityRole="button" hitSlop={8}>

@@ -83,8 +83,10 @@ export function RideClock() {
 
 export function DeviceLocationBridge() {
   const placeOnPhone = useRideStore((state) => state.placeOnPhone);
+  const liveMode = useRideStore((state) => state.liveMode);
 
   useEffect(() => {
+    if (liveMode) return;
     let subscription: Location.LocationSubscription | null = null;
     let alive = true;
 
@@ -122,7 +124,7 @@ export function DeviceLocationBridge() {
       alive = false;
       subscription?.remove();
     };
-  }, [placeOnPhone]);
+  }, [liveMode, placeOnPhone]);
 
   return null;
 }

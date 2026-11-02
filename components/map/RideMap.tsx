@@ -8,7 +8,6 @@ import type { RideMapProps } from "@/components/map/types";
 import { useSmoothPose } from "@/components/map/useSmoothPose";
 import { googleMapsApiKey } from "@/constants/maps";
 import { darkMapStyle, lightMapStyle } from "@/constants/mapStyle";
-import { mapSeed } from "@/data/route";
 import { useReduceMotion } from "@/hooks/useReduceMotion";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -64,11 +63,18 @@ function NativeRideMap({
       ref={mapRef}
       style={StyleSheet.absoluteFill}
       provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
-      initialRegion={mapSeed}
+      initialRegion={{
+        latitude: position.latitude,
+        longitude: position.longitude,
+        latitudeDelta: 0.04,
+        longitudeDelta: 0.04,
+      }}
       customMapStyle={Platform.OS === "android" ? (scheme === "light" ? lightMapStyle : darkMapStyle) : undefined}
       userInterfaceStyle={scheme}
       mapType={Platform.OS === "ios" ? "mutedStandard" : "standard"}
       showsCompass={false}
+      showsUserLocation={false}
+      followsUserLocation={false}
       showsMyLocationButton={false}
       toolbarEnabled={false}
       rotateEnabled={false}

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 
@@ -15,6 +15,7 @@ import { useLiveApiRefresh } from "@/hooks/useLiveApiRefresh";
 import { useTheme } from "@/providers/ThemeProvider";
 import { useRideStore } from "@/stores/useRideStore";
 import type { MediaChannel } from "@/types/domain";
+import { hasAlertClip } from "@/utils/alerts";
 
 const statusFilters = [
   { id: "all", label: "All" },
@@ -46,10 +47,22 @@ export function AlertsScreen() {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const openCount = useMemo(() => alerts.filter((alert) => !alert.acknowledged).length, [alerts]);
+  const listed = useMemo(
+    () => (liveMode ? alerts.filter((alert) => hasAlertClip(alert)) : alerts),
+    [alerts, liveMode],
+  );
+  const openCount = useMemo(() => listed.filter((alert) => !alert.acknowledged).length, [listed]);
+
+  useEffect(() => {
+    if (!liveMode) return;
+    const id = setInterval(() => {
+      void refreshAlerts("all").catch(() => undefined);
+    }, 20_000);
+    return () => clearInterval(id);
+  }, [liveMode, refreshAlerts]);
 
   const visible = useMemo(() => {
-    const filtered = alerts.filter((alert) => {
+    const filtered = listed.filter((alert) => {
       if (channel !== "all" && alert.channel !== channel) return false;
       if (filter === "open") return !alert.acknowledged;
       if (filter === "caution") return alert.severity === "medium" || alert.severity === "low" || alert.severity === "info";
@@ -57,7 +70,7 @@ export function AlertsScreen() {
       return true;
     });
     return [...filtered].sort((a, b) => b.at - a.at);
-  }, [alerts, channel, filter]);
+  }, [channel, filter, listed]);
 
   const onRefresh = useCallback(() => {
     if (!liveMode) return;
@@ -75,9 +88,9 @@ export function AlertsScreen() {
   return (
     <Page
       title="Alerts"
-      subtitle={
+          subtitle={
         liveMode
-          ? `${openCount} open · ${alerts.length} total`
+          ? `${openCount} open · ${listed.length} with a clip`
           : openCount > 0
             ? `${openCount} open`
             : "Nothing waiting"
@@ -133,8 +146,8 @@ export function AlertsScreen() {
           body={
             liveMode
               ? filter === "all" && channel === "all"
-                ? "The guardian API returned an empty alerts list for this ride."
-                : "Nothing matches these filters. Switch to All / Both to see every event."
+                ? "Alerts appear here after the car attaches a clip id. That can take about half a minute."
+                : "Nothing matches these filters. Switch to All / Both to see every event with a clip."
               : "Open events show up as the ride continues."
           }
           actionLabel={filter === "all" && channel === "all" ? undefined : "Show all"}

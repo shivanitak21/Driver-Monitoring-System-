@@ -6,7 +6,6 @@ import { Page } from "@/components/layout/Page";
 import { CabinLibrary } from "@/components/media/CabinLibrary";
 import { CabinMediaBar } from "@/components/media/CabinMediaBar";
 import { LiveStill } from "@/components/media/LiveStill";
-import { AnalysisPanel } from "@/components/safety/AnalysisPanel";
 import { SeatOccupancyGrid } from "@/components/safety/SeatOccupancyGrid";
 import { ApiStatusBanner } from "@/components/system/ApiStatusBanner";
 import { StatusChip } from "@/components/system/StatusChip";
@@ -39,11 +38,9 @@ export function CabinScreen() {
   const publisherOnline = useRideStore((state) => state.publisherOnline);
   const deviceState = useRideStore((state) => state.deviceState);
   const rideId = useRideStore((state) => state.rideId);
-  const analysis = useRideStore((state) => state.analysis);
   const frameDms = useRideStore((state) => state.frameDms);
   const frameCms = useRideStore((state) => state.frameCms);
   const recordings = useRideStore((state) => state.recordings);
-  const phoneClips = useRideStore((state) => state.phoneClips);
   const snapshots = useRideStore((state) => state.snapshots);
   const guardians = useRideStore((state) => state.guardians);
   const liveMode = useRideStore((state) => state.liveMode);
@@ -60,6 +57,7 @@ export function CabinScreen() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [note, setNote] = useState("");
   const [camera, setCamera] = useState<CameraTab>("both");
+  const [snapChannel, setSnapChannel] = useState<MediaChannel>("dms");
   const [frameTick, setFrameTick] = useState(0);
 
   useEffect(() => {
@@ -121,7 +119,6 @@ export function CabinScreen() {
   }, [consent, liveMode, phase, refreshAnalysis, refreshFrames]);
 
   const attentive = driverState === "attentive";
-  const snapChannel: MediaChannel = camera === "dms" ? "dms" : "cms";
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -227,10 +224,10 @@ export function CabinScreen() {
                 <View style={styles.sectionHead}>
                   <AppText variant="caption">Live</AppText>
                 </View>
-                <CabinMediaBar channel={snapChannel} />
+                <CabinMediaBar channel={snapChannel} onChannelChange={setSnapChannel} />
               </View>
 
-              <CabinLibrary recordings={[...phoneClips, ...recordings]} snapshots={snapshots} />
+              <CabinLibrary recordings={recordings} snapshots={snapshots} />
               {guardians.length === 0 ? (
                 <AppText variant="caption">Add someone in Family before Snap or Record.</AppText>
               ) : null}
@@ -241,7 +238,11 @@ export function CabinScreen() {
                 </View>
                 <Segmented
                   value={camera}
-                  onChange={(id) => setCamera(id as CameraTab)}
+                  onChange={(id) => {
+                    const next = id as CameraTab;
+                    setCamera(next);
+                    if (next === "dms" || next === "cms") setSnapChannel(next);
+                  }}
                   items={[
                     { id: "both", label: "Both" },
                     { id: "dms", label: "Driver" },
@@ -263,12 +264,6 @@ export function CabinScreen() {
                 )}
               </View>
 
-              {(camera === "both" || camera === "dms") && (
-                <AnalysisPanel title="Driver" side={analysis?.dms} />
-              )}
-              {(camera === "both" || camera === "cms") && (
-                <AnalysisPanel title="Cabin" side={analysis?.cms} />
-              )}
             </>
           ) : (
             <ScreenState kind="empty" title="Offline demo" body="Set EXPO_PUBLIC_TELEMETRY_URL for live cabin." />

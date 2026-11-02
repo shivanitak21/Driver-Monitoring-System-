@@ -215,9 +215,12 @@ type RideState = {
   distanceM: number;
   direction: 1 | -1;
   position: Coordinate;
+  /** True only after the ride payload supplies a coordinate. The phone fix never sets this. */
+  positionFromApi: boolean;
   heading: number;
   speedKmh: number | null;
   trail: Coordinate[];
+  route: Coordinate[];
   etaMin: number | null;
   leg: "outbound" | "return";
   risk: RiskAssessment;
@@ -236,6 +239,7 @@ type RideState = {
   shareLink: string | null;
   history: HistoryRide[];
   analysis: RideAnalysis | null;
+  analysisError: string | null;
   frameDms: LiveFrame | null;
   frameCms: LiveFrame | null;
   videoSession: VideoSession | null;
@@ -344,9 +348,11 @@ export const useRideStore = create<RideState>()(
       distanceM: startDistance,
       direction: 1,
       position: initialMotion.position,
+      positionFromApi: false,
       heading: initialMotion.heading,
       speedKmh: liveMode ? null : initialMotion.speedKmh,
       trail: liveMode ? [] : [initialMotion.position],
+      route: [],
       etaMin: liveMode ? null : initialMotion.etaMin,
       leg: "outbound",
       risk: calm,
@@ -365,6 +371,7 @@ export const useRideStore = create<RideState>()(
       shareLink: `vms://trip/${defaultRideId()}`,
       history: [],
       analysis: null,
+      analysisError: null,
       frameDms: null,
       frameCms: null,
       videoSession: null,
@@ -669,9 +676,6 @@ export const useRideStore = create<RideState>()(
       placeOnPhone: (fix) => {
         const state = get();
         if (state.liveMode) {
-          // Phone fix is the blue dot; vehicle pose still comes from ride/socket.
-          set({ deviceFix: fix });
-          void get().publishTelemetry(fix);
           return;
         }
         const far =
@@ -717,12 +721,24 @@ export const useRideStore = create<RideState>()(
         }, 700);
       },
       applyRide: (ride) => {
+        const routePoints = Array.isArray(ride.route)
+          ? ride.route.filter(
+              (point): point is Coordinate =>
+                !!point &&
+                typeof point.latitude === "number" &&
+                typeof point.longitude === "number" &&
+                Number.isFinite(point.latitude) &&
+                Number.isFinite(point.longitude),
+            )
+          : [];
         const coordinate =
           ride.position &&
           typeof ride.position.latitude === "number" &&
           typeof ride.position.longitude === "number"
             ? { latitude: ride.position.latitude, longitude: ride.position.longitude }
-            : null;
+            : routePoints.length > 0
+              ? routePoints[routePoints.length - 1]
+              : null;
         const state = get();
         set({
           rideId: ride.id || state.rideId,
@@ -743,7 +759,10 @@ export const useRideStore = create<RideState>()(
           speedKmh: ride.speedKmh === undefined ? state.speedKmh : ride.speedKmh,
           heading: ride.heading === undefined || ride.heading === null ? state.heading : ride.heading,
           position: coordinate ?? state.position,
-          trail: coordinate ? [...state.trail, coordinate].slice(-40) : state.trail,
+          positionFromApi: coordinate ? true : state.positionFromApi,
+          follow: coordinate && !state.positionFromApi ? true : state.follow,
+          trail: coordinate ? [...(state.positionFromApi ? state.trail : []), coordinate].slice(-40) : state.trail,
+          route: routePoints.length > 0 ? routePoints : state.route,
           lastSyncedAt: Date.now(),
           connectionError: null,
         });
@@ -768,7 +787,14 @@ export const useRideStore = create<RideState>()(
           set({ booting: false, connection: "idle", liveMode: false });
           return;
         }
-        set({ liveMode: true, connection: "connecting", connectionError: null, booting: true });
+        set({
+          liveMode: true,
+          connection: "connecting",
+          connectionError: null,
+          booting: true,
+          deviceFix: null,
+          routeShift: null,
+        });
         try {
           const health = await services.api.health();
           const rideId = health.ride || get().rideId || defaultRideId();
@@ -789,6 +815,7 @@ export const useRideStore = create<RideState>()(
             notices,
             history,
             analysis,
+            analysisError: null,
             booting: false,
             connection: "live",
             connectionError: null,
@@ -877,9 +904,9 @@ export const useRideStore = create<RideState>()(
         if (!services.api) return;
         try {
           const analysis = await services.api.getAnalysis(get().rideId);
-          set({ analysis, lastSyncedAt: Date.now(), connectionError: null });
+          set({ analysis, analysisError: null, lastSyncedAt: Date.now() });
         } catch (error) {
-          set({ connectionError: describeServiceError(error) });
+          set({ analysisError: describeServiceError(error) });
           throw error;
         }
       },
@@ -974,7 +1001,7 @@ export const useRideStore = create<RideState>()(
         try {
           const recording = await services.api.startRecording(get().rideId, guardianId);
           set({
-            activeRecording: recording.status === "recording" || recording.status === "stopping" ? recording : null,
+            activeRecording: recording.status === "recording" ? recording : null,
             recordings: [recording, ...get().recordings.filter((item) => item.id !== recording.id)],
             lastSyncedAt: Date.now(),
             connectionError: null,
@@ -991,8 +1018,7 @@ export const useRideStore = create<RideState>()(
         try {
           const recording = await services.api.cancelRecording(get().rideId, active.id);
           set({
-            activeRecording:
-              recording.status === "recording" || recording.status === "stopping" ? recording : null,
+            activeRecording: null,
             recordings: [recording, ...get().recordings.filter((item) => item.id !== recording.id)],
             lastSyncedAt: Date.now(),
             connectionError: null,
@@ -1001,8 +1027,8 @@ export const useRideStore = create<RideState>()(
           if (recording.status === "stopping" || recording.status === "recording") {
             const id = recording.id;
             void (async () => {
-              for (let i = 0; i < 15; i += 1) {
-                await new Promise((resolve) => setTimeout(resolve, 2000));
+              for (let i = 0; i < 45; i += 1) {
+                await new Promise((resolve) => setTimeout(resolve, 4000));
                 try {
                   await get().refreshRecordings();
                 } catch {
@@ -1023,8 +1049,7 @@ export const useRideStore = create<RideState>()(
         const guardianId = primaryGuardianId(get().guardians) ?? undefined;
         try {
           const recordings = await services.api.listRecordings(get().rideId, guardianId);
-          const active =
-            recordings.find((item) => item.status === "recording" || item.status === "stopping") ?? null;
+          const active = recordings.find((item) => item.status === "recording") ?? null;
           set({
             recordings,
             activeRecording: active,
@@ -1091,6 +1116,7 @@ export const useRideStore = create<RideState>()(
             notices,
             history,
             analysis,
+            analysisError: null,
             refreshing: false,
             connection: "live",
             connectionError: null,

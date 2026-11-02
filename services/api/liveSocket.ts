@@ -1,5 +1,5 @@
 import { wsBaseUrl } from "@/services/api/config";
-import { normalizeAlert, normalizeRide } from "@/services/api/normalize";
+import { normalizeAlert, normalizeAnalysisSide, normalizeRide } from "@/services/api/normalize";
 import type { LiveEvent, RideDto } from "@/services/api/types";
 import type { AnalysisSide, MediaChannel, SafetyAlert } from "@/types/domain";
 
@@ -57,8 +57,9 @@ export function connectLiveSocket(rideId: string, handlers: LiveSocketHandlers):
 
     if (msg.type === "analysis") {
       const channel = msg.channel === "cms" ? "cms" : msg.channel === "dms" ? "dms" : null;
-      if (!channel || !msg.analysis) return;
-      handlers.onAnalysis?.(channel, msg.analysis);
+      const side = normalizeAnalysisSide(msg.analysis);
+      if (!channel || !side) return;
+      handlers.onAnalysis?.(channel, side);
     }
   };
 

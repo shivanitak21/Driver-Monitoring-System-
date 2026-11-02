@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import type { BottomTabBarProps } from "expo-router/js-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { hasAlertClip } from "@/utils/alerts";
 import { selectionFeedback } from "@/utils/haptics";
 
 import { AppText } from "@/components/ui/AppText";
@@ -21,7 +22,10 @@ const tabs: Record<string, { label: string; Icon: typeof Navigation }> = {
 };
 
 export function DockTabBar({ state, emitter, navigateToTab, insets }: BottomTabBarProps) {
-  const openAlerts = useRideStore((store) => store.alerts.filter((alert) => !alert.acknowledged).length);
+  const liveMode = useRideStore((store) => store.liveMode);
+  const openAlerts = useRideStore((store) =>
+    store.alerts.filter((alert) => !alert.acknowledged && (!liveMode || hasAlertClip(alert))).length,
+  );
   const { colors } = useTheme();
   const styles = useMemo(
     () =>

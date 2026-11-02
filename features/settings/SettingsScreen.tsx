@@ -55,7 +55,7 @@ export function SettingsScreen() {
         <AppText variant="caption" style={{ marginTop: 8 }}>
           Link status: {liveMode ? connection : "idle"} · docs at /docs
           {"\n"}Integrated: ride + live socket, telemetry, alerts/ack (+ startedAt), analysis, frames/live,
-          Watch/Listen (LiveKit cabin video+audio), Speak (guardian-mic), Record/Snap (guardianId),
+          Watch (LiveKit driver + cabin video, cabin mic), Speak (guardian-mic), Record/Snap on the server,
           history, clips, SOS, cabin, guardians/share, notices. Push-token client ready.
         </AppText>
       ) : null}
@@ -76,7 +76,7 @@ export function SettingsScreen() {
       <View style={[styles.group, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}>
         <PermissionRow
           title="Location"
-          body="Shows this phone on the map and moves the route onto that fix."
+          body="Optional phone dot on the demo map. The live vehicle stays on the ride coordinates."
           granted={Boolean(location?.granted)}
           denied={locationDenied || location?.status === "denied"}
           primary={primaryPermission === "location"}

@@ -1,110 +1,152 @@
 /**
- * Minimal LiveKit viewer HTML for WebView.
- * Subscribes to remote tracks named "cabin" (video + audio) per FRONTEND.md.
- * Page must be served from an http(s) base that allows the LiveKit ws/wss URL
- * (do not use https://localhost with ws:// — browsers block that).
+ * LiveKit viewer for Watch.
+ * Subscribes to video tracks named "driver" and "cabin", and the audio track named "cabin".
+ * Pictures use object-fit: contain so the camera frame is not cropped or stretched.
  */
 export function buildLiveKitWatchHtml(options: {
   url: string;
   token: string;
   /** When false, cabin audio stays muted (Watch without Listen). */
   listen: boolean;
+  /** both | driver | cabin */
+  layout: "both" | "driver" | "cabin";
+  /** driver | cabin — which pane a snapshot will use */
+  selected: "driver" | "cabin";
+  driverPoster?: string;
+  cabinPoster?: string;
 }) {
   const url = JSON.stringify(options.url);
   const token = JSON.stringify(options.token);
   const listen = options.listen ? "true" : "false";
+  const layout = JSON.stringify(options.layout);
+  const selected = JSON.stringify(options.selected);
+  const driverPoster = JSON.stringify(options.driverPoster || "");
+  const cabinPoster = JSON.stringify(options.cabinPoster || "");
 
   return `<!DOCTYPE html>
-<html>
+<html data-layout=${layout} data-selected=${selected}>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #0a0a0a; overflow: hidden; font-family: -apple-system, system-ui, sans-serif; }
-    #stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
-    video { width: 100%; height: 100%; object-fit: cover; background: #000; }
+    html, body { margin: 0; height: 100%; background: #090A0C; font-family: -apple-system, system-ui, sans-serif; }
+    #stage { box-sizing: border-box; height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 8px; }
+    button.pane {
+      display: block; width: 100%; padding: 0; margin: 0; appearance: none; -webkit-appearance: none;
+      position: relative; flex: 1; min-height: 0; border-radius: 18px; overflow: hidden;
+      background: #000; border: 1.5px solid rgba(255,255,255,0.14); color: inherit; font: inherit; text-align: left;
+    }
+    html[data-layout="driver"] .pane-cabin, html[data-layout="cabin"] .pane-driver { display: none; }
+    html[data-selected="driver"] .pane-driver, html[data-selected="cabin"] .pane-cabin { border-color: #D7F76B; }
+    video, .poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+    .tag {
+      position: absolute; top: 10px; display: flex; align-items: center; gap: 6px;
+      padding: 5px 10px; border-radius: 999px; background: rgba(0,0,0,0.55); color: #F5F6F7;
+      font-size: 12px; font-weight: 600; letter-spacing: 0.01em;
+    }
+    .tag.left { left: 10px; }
+    .tag.right { right: 10px; }
+    .dot { width: 7px; height: 7px; border-radius: 4px; background: #8B929C; }
+    .pane.on .dot { background: #FF453A; }
     #tap {
-      display: none; position: absolute; inset: 0; align-items: center; justify-content: center;
-      background: rgba(0,0,0,0.45); color: #fff; font-size: 15px; font-weight: 600;
+      display: none; position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 3;
+      padding: 12px; border-radius: 14px; text-align: center;
+      background: rgba(0,0,0,0.62); color: #fff; font-size: 14px; font-weight: 600;
     }
-    #status {
-      position: absolute; left: 12px; bottom: 14px; max-width: 72%;
-      padding: 7px 12px; border-radius: 999px;
-      background: rgba(0,0,0,0.55); color: #f5f5f7; font-size: 12px; line-height: 1.35;
-      pointer-events: none;
-    }
+    #status { display: none; }
   </style>
 </head>
 <body>
-  <div id="stage"><video id="video" playsinline webkit-playsinline autoplay muted></video></div>
+  <div id="stage">
+    <button type="button" class="pane pane-driver" id="pane-driver" aria-label="Driver camera">
+      <img class="poster" id="poster-driver" alt="" />
+      <video id="video-driver" playsinline webkit-playsinline autoplay muted></video>
+      <span class="tag left"><span class="dot"></span>Driver</span>
+      <span class="tag right" id="state-driver">Waiting</span>
+    </button>
+    <button type="button" class="pane pane-cabin" id="pane-cabin" aria-label="Cabin camera">
+      <img class="poster" id="poster-cabin" alt="" />
+      <video id="video-cabin" playsinline webkit-playsinline autoplay muted></video>
+      <span class="tag left"><span class="dot"></span>Cabin</span>
+      <span class="tag right" id="state-cabin">Waiting</span>
+    </button>
+  </div>
   <div id="tap">Tap to enable cabin audio</div>
-  <div id="status">Loading player…</div>
+  <div id="status"></div>
   <script>
     (function () {
       var statusEl = document.getElementById("status");
-      var videoEl = document.getElementById("video");
       var tapEl = document.getElementById("tap");
       var listen = ${listen};
       var room = null;
       var audioEl = null;
       var pendingAudioTrack = null;
-      var hasVideo = false;
+      var hasDriver = false;
+      var hasCabin = false;
       var hasAudio = false;
-      var remoteVideoTrack = null;
-      var remoteAudioTrack = null;
-      var mediaRecorder = null;
-      var recordChunks = [];
-      var recording = false;
       var cdns = [
         "https://cdn.jsdelivr.net/npm/livekit-client@2.9.1/dist/livekit-client.umd.min.js",
         "https://unpkg.com/livekit-client@2.9.1/dist/livekit-client.umd.min.js"
       ];
 
+      function setPoster(id, src) {
+        var img = document.getElementById(id);
+        if (!img) return;
+        if (!src) { img.style.display = "none"; return; }
+        img.src = src;
+      }
+      setPoster("poster-driver", ${driverPoster});
+      setPoster("poster-cabin", ${cabinPoster});
+
       function post(payload) {
         try {
-          if (window.ReactNativeWebView) {
-            window.ReactNativeWebView.postMessage(JSON.stringify(payload));
-          }
+          if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(payload));
         } catch (e) {}
       }
-
       function setStatus(msg) {
         statusEl.textContent = msg;
         post({ type: "status", message: msg });
       }
-
-      function cabinName(pub, track) {
+      function report() {
+        post({ type: "tracks", driver: hasDriver, cabin: hasCabin, audio: hasAudio });
+        if (hasDriver && hasCabin && listen && hasAudio) setStatus("Driver and cabin live · listening");
+        else if (hasDriver && hasCabin) setStatus(listen ? "Driver and cabin live · waiting for mic" : "Driver and cabin live");
+        else if (hasDriver || hasCabin) setStatus("One camera live · waiting for the other");
+        else setStatus("In room · waiting for the car to publish");
+      }
+      function trackName(pub, track) {
         var name = "";
         if (pub) name = pub.trackName || pub.name || "";
         if (!name && track) name = track.name || "";
         return String(name || "").toLowerCase();
       }
-
-      function isCabin(pub, track) {
-        return cabinName(pub, track) === "cabin";
-      }
-
       function kindOf(pub, track) {
-        if (pub && pub.kind) return pub.kind;
-        if (track && track.kind) return track.kind;
+        if (pub && pub.kind) return String(pub.kind);
+        if (track && track.kind) return String(track.kind);
         return "";
       }
-
-      function attachVideo(track) {
+      function attachVideo(track, which) {
+        var video = document.getElementById(which === "driver" ? "video-driver" : "video-cabin");
+        var pane = document.getElementById(which === "driver" ? "pane-driver" : "pane-cabin");
+        var state = document.getElementById(which === "driver" ? "state-driver" : "state-cabin");
+        var poster = document.getElementById(which === "driver" ? "poster-driver" : "poster-cabin");
+        if (!video) return;
         try {
-          remoteVideoTrack = track;
-          track.attach(videoEl);
-          videoEl.muted = true;
-          videoEl.playsInline = true;
-          videoEl.play().catch(function () {});
-          hasVideo = true;
-          post({ type: "track", kind: "video" });
-          updateStatus();
+          track.attach(video);
+          video.muted = true;
+          video.playsInline = true;
+          video.play().catch(function () {});
+          if (poster) poster.style.display = "none";
+          if (pane) pane.classList.add("on");
+          if (state) state.textContent = "Live";
+          if (which === "driver") hasDriver = true;
+          else hasCabin = true;
+          post({ type: "track", kind: "video", name: which });
+          report();
         } catch (e) {
-          setStatus("Video attach failed");
+          setStatus("Could not attach the " + which + " camera");
         }
       }
-
       function ensureAudioElement() {
         if (!audioEl) {
           audioEl = document.createElement("audio");
@@ -114,72 +156,37 @@ export function buildLiveKitWatchHtml(options: {
         }
         return audioEl;
       }
-
       function attachAudio(track) {
         pendingAudioTrack = track;
-        remoteAudioTrack = track;
-        if (!listen) {
-          hasAudio = false;
-          updateStatus();
-          return;
-        }
+        if (!listen) { hasAudio = false; report(); return; }
         try {
           var el = ensureAudioElement();
           track.attach(el);
           el.muted = false;
           el.volume = 1;
           var play = el.play();
-          if (play && play.then) {
-            play.then(function () {
-              hasAudio = true;
-              tapEl.style.display = "none";
-              post({ type: "track", kind: "audio" });
-              updateStatus();
-            }).catch(function () {
-              tapEl.style.display = "flex";
-              setStatus("Tap to enable cabin audio");
-            });
-          } else {
+          var ok = function () {
             hasAudio = true;
-            post({ type: "track", kind: "audio" });
-            updateStatus();
-          }
-          if (room && room.startAudio) {
-            room.startAudio().then(function () {
-              hasAudio = true;
-              tapEl.style.display = "none";
-              updateStatus();
-            }).catch(function () {
-              tapEl.style.display = "flex";
-            });
-          }
+            tapEl.style.display = "none";
+            post({ type: "track", kind: "audio", name: "cabin" });
+            report();
+          };
+          if (play && play.then) play.then(ok).catch(function () { tapEl.style.display = "block"; setStatus("Tap to enable cabin audio"); });
+          else ok();
+          if (room && room.startAudio) room.startAudio().then(ok).catch(function () { tapEl.style.display = "block"; });
         } catch (e) {
-          setStatus("Audio attach failed");
+          setStatus("Cabin audio failed to start");
         }
       }
-
-      function updateStatus() {
-        if (hasVideo && listen && hasAudio) setStatus("Watching · listening (cabin)");
-        else if (hasVideo && listen) setStatus("Cabin video · waiting for mic…");
-        else if (hasVideo) setStatus("Watching cabin · audio muted");
-        else if (listen) setStatus("Connected · waiting for cabin video + mic");
-        else setStatus("Connected · waiting for cabin publisher");
-      }
-
       function handleTrack(track, pub) {
         if (!track) return;
+        var name = trackName(pub, track);
         var kind = kindOf(pub, track);
-        var cabin = isCabin(pub, track);
-        if (kind === "video") {
-          // Prefer cabin; otherwise take first video so a misnamed track still shows.
-          if (cabin || !hasVideo) attachVideo(track);
-          return;
-        }
-        if (kind === "audio") {
-          if (cabin || !pendingAudioTrack) attachAudio(track);
-        }
+        if (name === "driver" && kind !== "audio") { attachVideo(track, "driver"); return; }
+        if (name === "cabin" && kind === "audio") { attachAudio(track); return; }
+        if (name === "cabin" && kind !== "audio") { attachVideo(track, "cabin"); return; }
+        if (kind === "audio") attachAudio(track);
       }
-
       function wireParticipant(p) {
         if (!p) return;
         var pubs = p.trackPublications || p.tracks;
@@ -189,13 +196,25 @@ export function buildLiveKitWatchHtml(options: {
           });
         }
       }
-
+      window.__vmsSetLayout = function (mode) {
+        document.documentElement.setAttribute("data-layout", mode === "driver" || mode === "cabin" ? mode : "both");
+      };
+      window.__vmsSetSelected = function (name) {
+        document.documentElement.setAttribute("data-selected", name === "cabin" ? "cabin" : "driver");
+      };
+      document.getElementById("pane-driver").addEventListener("click", function () {
+        window.__vmsSetSelected("driver");
+        post({ type: "select", channel: "dms" });
+      });
+      document.getElementById("pane-cabin").addEventListener("click", function () {
+        window.__vmsSetSelected("cabin");
+        post({ type: "select", channel: "cms" });
+      });
       tapEl.addEventListener("click", function () {
         if (!listen || !pendingAudioTrack) return;
         attachAudio(pendingAudioTrack);
         if (room && room.startAudio) room.startAudio().catch(function () {});
       });
-
       function loadScript(src) {
         return new Promise(function (resolve, reject) {
           var s = document.createElement("script");
@@ -206,7 +225,6 @@ export function buildLiveKitWatchHtml(options: {
           document.head.appendChild(s);
         });
       }
-
       async function ensureSdk() {
         if (window.LivekitClient || window.LiveKit) return;
         var last = null;
@@ -214,13 +232,10 @@ export function buildLiveKitWatchHtml(options: {
           try {
             await loadScript(cdns[i]);
             if (window.LivekitClient || window.LiveKit) return;
-          } catch (e) {
-            last = e;
-          }
+          } catch (e) { last = e; }
         }
         throw last || new Error("LiveKit SDK failed to load");
       }
-
       async function start() {
         try {
           setStatus("Loading LiveKit…");
@@ -231,177 +246,28 @@ export function buildLiveKitWatchHtml(options: {
             post({ type: "error", message: "LiveKit SDK failed to load" });
             return;
           }
-          var Room = LK.Room;
-          var RoomEvent = LK.RoomEvent;
-          room = new Room({ adaptiveStream: true, dynacast: true });
-
-          room.on(RoomEvent.TrackSubscribed, function (track, publication) {
-            handleTrack(track, publication);
-          });
-          room.on(RoomEvent.ParticipantConnected, function (p) {
-            setStatus("Publisher joined…");
-            wireParticipant(p);
-          });
-          room.on(RoomEvent.Disconnected, function () {
+          room = new LK.Room({ adaptiveStream: true, dynacast: true });
+          room.on(LK.RoomEvent.TrackSubscribed, function (track, publication) { handleTrack(track, publication); });
+          room.on(LK.RoomEvent.ParticipantConnected, function (p) { wireParticipant(p); });
+          room.on(LK.RoomEvent.Disconnected, function () {
+            hasDriver = false;
+            hasCabin = false;
+            hasAudio = false;
             setStatus("Disconnected");
             post({ type: "disconnected" });
+            report();
           });
-
-          setStatus("Connecting to cabin…");
+          setStatus("Connecting…");
           await room.connect(${url}, ${token});
           post({ type: "connected", room: room.name || "" });
-          if (room.remoteParticipants && room.remoteParticipants.forEach) {
-            room.remoteParticipants.forEach(wireParticipant);
-          }
-          if (!room.remoteParticipants || room.remoteParticipants.size === 0) {
-            setStatus("In room · waiting for car to publish cabin");
-          } else {
-            updateStatus();
-          }
+          if (room.remoteParticipants && room.remoteParticipants.forEach) room.remoteParticipants.forEach(wireParticipant);
+          report();
         } catch (err) {
           var msg = (err && err.message) ? err.message : "Connect failed";
           setStatus(msg);
           post({ type: "error", message: msg });
         }
       }
-
-      function pickRecorderMime() {
-        if (typeof MediaRecorder === "undefined") return null;
-        var types = [
-          "video/webm;codecs=vp8,opus",
-          "video/webm;codecs=vp9,opus",
-          "video/webm",
-          "video/mp4"
-        ];
-        for (var i = 0; i < types.length; i++) {
-          try {
-            if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(types[i])) return types[i];
-          } catch (e) {}
-        }
-        return "";
-      }
-
-      function buildRecordStream() {
-        var stream = new MediaStream();
-        var added = 0;
-        try {
-          if (videoEl && videoEl.srcObject) {
-            videoEl.srcObject.getTracks().forEach(function (t) {
-              stream.addTrack(t);
-              added += 1;
-            });
-          }
-        } catch (e) {}
-        if (added === 0 && remoteVideoTrack && remoteVideoTrack.mediaStreamTrack) {
-          stream.addTrack(remoteVideoTrack.mediaStreamTrack);
-          added += 1;
-        }
-        if (remoteAudioTrack && remoteAudioTrack.mediaStreamTrack) {
-          try {
-            stream.addTrack(remoteAudioTrack.mediaStreamTrack);
-            added += 1;
-          } catch (e) {}
-        } else if (audioEl && audioEl.srcObject) {
-          try {
-            audioEl.srcObject.getAudioTracks().forEach(function (t) {
-              stream.addTrack(t);
-              added += 1;
-            });
-          } catch (e) {}
-        }
-        return added > 0 ? stream : null;
-      }
-
-      function postBase64Chunks(dataUrl, mime) {
-        var parts = String(dataUrl || "").split(",");
-        var b64 = parts.length > 1 ? parts[1] : parts[0];
-        if (!b64) {
-          post({ type: "recording-error", message: "Empty recording" });
-          return;
-        }
-        var chunkSize = 180000;
-        var total = Math.ceil(b64.length / chunkSize) || 1;
-        post({ type: "recording-begin", total: total, mime: mime || "video/webm", bytes: b64.length });
-        for (var i = 0; i < total; i++) {
-          post({
-            type: "recording-chunk",
-            index: i,
-            total: total,
-            data: b64.slice(i * chunkSize, (i + 1) * chunkSize)
-          });
-        }
-        post({ type: "recording-done", total: total, mime: mime || "video/webm" });
-      }
-
-      window.__vmsStartLocalRecord = function () {
-        try {
-          if (recording) {
-            post({ type: "recording-status", message: "already recording" });
-            return;
-          }
-          if (typeof MediaRecorder === "undefined") {
-            post({ type: "recording-error", message: "MediaRecorder not available on this WebView" });
-            return;
-          }
-          var stream = buildRecordStream();
-          if (!stream) {
-            post({ type: "recording-error", message: "No live cabin video yet. Wait until the picture is moving, then Record." });
-            return;
-          }
-          var mime = pickRecorderMime();
-          recordChunks = [];
-          mediaRecorder = mime
-            ? new MediaRecorder(stream, { mimeType: mime })
-            : new MediaRecorder(stream);
-          var usedMime = mediaRecorder.mimeType || mime || "video/webm";
-          mediaRecorder.ondataavailable = function (ev) {
-            if (ev.data && ev.data.size > 0) recordChunks.push(ev.data);
-          };
-          mediaRecorder.onerror = function () {
-            recording = false;
-            post({ type: "recording-error", message: "Recorder failed" });
-          };
-          mediaRecorder.onstop = function () {
-            recording = false;
-            var blob = new Blob(recordChunks, { type: usedMime });
-            recordChunks = [];
-            if (!blob.size) {
-              post({ type: "recording-error", message: "Recording was empty" });
-              return;
-            }
-            var reader = new FileReader();
-            reader.onloadend = function () {
-              postBase64Chunks(String(reader.result || ""), usedMime);
-            };
-            reader.onerror = function () {
-              post({ type: "recording-error", message: "Could not read recording" });
-            };
-            reader.readAsDataURL(blob);
-          };
-          mediaRecorder.start(1000);
-          recording = true;
-          post({ type: "recording-started", mime: usedMime });
-          setStatus("Recording cabin locally…");
-        } catch (err) {
-          recording = false;
-          post({ type: "recording-error", message: (err && err.message) ? err.message : "Record start failed" });
-        }
-      };
-
-      window.__vmsStopLocalRecord = function () {
-        try {
-          if (!mediaRecorder || !recording) {
-            post({ type: "recording-error", message: "Not recording" });
-            return;
-          }
-          setStatus("Saving local recording…");
-          mediaRecorder.stop();
-        } catch (err) {
-          recording = false;
-          post({ type: "recording-error", message: (err && err.message) ? err.message : "Record stop failed" });
-        }
-      };
-
       start();
     })();
   </script>

@@ -25,7 +25,7 @@ Times named `at`, `startedAt`, `endedAt`, `expiresAt`, and `lastNotifiedAt` are 
 
 Do not put these in the app: `MEDIA_DEVICE_KEY`, `LIVEKIT_API_SECRET`, MQTT password, EMQX dashboard password.
 
-Share this file. The new calls are Speak (`POST /video/talk`), guardian recordings and snaps (lists filtered by `guardianId`), alerts for one trip (`GET /alerts?startedAt=`), and push after `POST /push-token`. Alert clip id is still `alerts[].clipId`. The live cabin stream is still `GET /video` (track `cabin`).
+Share this file. The new calls are Speak (`POST /video/talk`), guardian recordings and snaps (lists filtered by `guardianId`), alerts for one trip (`GET /alerts?startedAt=`), and push after `POST /push-token`. Alert clip id is still `alerts[].clipId`. Live video is `GET /video`, then two LiveKit tracks: `driver` and `cabin`.
 
 ---
 
@@ -297,7 +297,7 @@ Not an alert. Latest description only. DMS is the driver scene. CMS is the cabin
 }
 ```
 
-A side that has not arrived yet is `null`. `aggression` is `calm`, `argument`, or `panic`. Show `dms` on the driver page and `cms` on the cabin page. Driver alerts still come from the detector (`kind` `distraction` / `drowsiness`), not from `dms.hazards`.
+A side that has not arrived yet is `null`. Both sides stay `null` while the car is running with the VLM off. `aggression` is `calm`, `argument`, or `panic`. Show `dms` on the driver page and `cms` on the cabin page. Driver alerts still come from the detector (`kind` `distraction` / `drowsiness`), not from `dms.hazards`.
 
 ---
 
@@ -320,22 +320,28 @@ One current JPEG per channel, with the capture time.
 
 Load the picture from `{BASE}` + `url`. That URL is `GET /v1/rides/{rideId}/frames/live/image?channel=dms` (or `cms`) and the body is the JPEG, not JSON. `404` until the first frame. `403` when sharing is off. If `at` is more than about 15 seconds old, show the still as stale.
 
-`dms` is the driver camera. `cms` is the cabin camera. This is the live still only. It is not the Watch stream and not the alert clip.
+`dms` is the driver camera. `cms` is the cabin camera. This is the idle still on the trip page. It is not the Watch stream and not the alert clip. While Watch is publishing, the car stops these JPEG uploads, so `at` goes stale on purpose. Keep showing the LiveKit tracks during Watch. After `POST /video/cancel`, the stills start again.
 
 ---
 
 ## Live video
 
-Watch is one cabin stream: driver and passenger stitched into one picture, plus the cabin microphone. The app does not call the car. `GET /video` tells the car to start. `POST /video/cancel` tells it to stop. The stream stays up until that cancel. It does not expire on its own.
+Watch is two pictures plus the cabin microphone. The app does not call the car.
+
+1. `GET /video` tells the car to start. Until this call, the car stays on JPEG stills and does not join the room.
+2. Connect a LiveKit client to `url` with `token`.
+3. Subscribe to the video tracks named `driver` and `cabin`, and the audio track named `cabin`.
+4. `POST /video/cancel` tells the car to leave the room. The stream stays up until that cancel.
 
 `GET /v1/rides/{rideId}/video?track=all`
 
-`track` may be `all` (default), `driver`, or `cabin`. It only filters the `tracks` list in this JSON. The published picture is still the one cabin view.
+`track` may be `all` (default), `driver`, or `cabin`. Use `all` for Watch.
 
 ```json
 {
-  "url": "wss://YOUR_VPS_IP:7880",
+  "url": "ws://YOUR_VPS_IP:7880",
   "mode": "livekit",
+  "stream": "webrtc",
   "token": "<viewer jwt>",
   "room": "ride-1842",
   "tracks": ["driver", "cabin"],
@@ -346,15 +352,24 @@ Watch is one cabin stream: driver and passenger stitched into one picture, plus 
 }
 ```
 
+Use `url` exactly as returned. It may be `ws://`, not `wss://`.
+
+| Track name | What the car sends |
+|---|---|
+| `driver` | Driver camera. On the current Orin this is the USB webcam. |
+| `cabin` | Cabin camera. On the current Orin this is the cabin video file until a second camera is plugged in. |
+| `cabin` (audio) | Cabin microphone. Same name as the cabin video track. Subscribe to the audio track, not a second video. |
+
 | Field | Meaning |
 |---|---|
-| `publish` | `true` after this call. The car sends media until cancel. |
+| `publish` | `true` after this call. The car joins the room and sends both video tracks until cancel. |
+| `stream` | `webrtc` while Watch is on. `jpeg` when nobody is watching. |
 | `token` | Viewer token. It cannot publish. Refresh by calling `GET /video` again before `expiresAt`. That call does not stop the stream. |
-| `publisherOnline` | `true` when a frame arrived in the last minute. `false` means show "vehicle camera offline". |
+| `publisherOnline` | `true` when a JPEG arrived in the last minute. During Watch the car pauses JPEGs, so this flag can go `false` while LiveKit is still playing. Keep the player up from the room connection. Use this flag on the trip page, before Watch. |
 
 | `mode` | What to do |
 |---|---|
-| `livekit` | Connect a LiveKit client to `url` with `token`. Subscribe to one video track and one audio track, both named `cabin`. |
+| `livekit` | Connect to `url` with `token`. Subscribe to video `driver`, video `cabin`, and audio `cabin`. |
 | `local` | No LiveKit server. `GET /v1/rides/{rideId}/video/live` returns the latest sample as JSON (`width`, `height`, `samples`, `rate`, `image_b64`, `audio_b64`, `seq`). This is for a local test, not the production player. |
 | `dummy` | No moving stream. `publish` is `false`. Show the JPEG from `{BASE}{preview}?track=driver` or `track=cabin`. |
 
@@ -366,7 +381,7 @@ Watch is one cabin stream: driver and passenger stitched into one picture, plus 
 { "ok": true, "publish": false, "room": "ride-1842" }
 ```
 
-`404` if the ride does not exist. The next time the car asks for a token it stops sending the stream. The live stills keep updating.
+`404` if the ride does not exist. The next time the car asks for a token it leaves the room and JPEG stills resume.
 
 ## Speak
 
@@ -392,7 +407,7 @@ This is the phone microphone played on the cabin speaker. It is separate from Wa
 
 `403` when sharing is off. `409` when the server is not in LiveKit mode. Cancel does not stop Watch.
 
-`GET /v1/rides/{rideId}/video/preview?track=driver` returns a JPEG body (`track` is `driver` or `cabin`). That JPEG is the Watch fallback. The trip still is `frames/live`. The moving stream is LiveKit when `mode` is `livekit`.
+`GET /v1/rides/{rideId}/video/preview?track=driver` returns a JPEG body (`track` is `driver` or `cabin`). Show that JPEG before Watch connects and if the room fails. The trip-page still is `frames/live`. The moving stream is the two LiveKit tracks when `mode` is `livekit`.
 
 ---
 
@@ -420,7 +435,9 @@ When `alert.clipId` is set:
 }
 ```
 
-Play `{BASE}` + `videoUrl` (`GET /v1/media/{clipId}/clip.mp4`). The body is `video/mp4`, about 8 seconds: 4 seconds before the alert and 4 seconds after. That file is what the guardian watches for this alert on this trip. `frames` are the same moment as stills. `channel` `dms` is the driver camera. `cms` is the cabin camera. `videoUrl` is `null` only when the car could not encode the file. `403` when sharing is off. `404` when that clip is not on this ride. `clipId` null means this alert has no clip yet.
+Play `{BASE}` + `videoUrl` (`GET /v1/media/{clipId}/clip.mp4`). The body is `video/mp4`, about 8 seconds: 4 seconds before the alert and 4 seconds after. That file is what the guardian watches for this alert on this trip. `frames` are the same moment as stills. `channel` `dms` is the driver camera. `cms` is the cabin camera. `videoUrl` is `null` only when the car could not encode the file. `403` when sharing is off. `404` when that clip is not on this ride.
+
+The alert socket event does not include the picture. MQTT does not either. `clipId` is `null` until the car finishes the upload, which can take up to about 30 seconds. When the first payload has `clipId: null`, read `GET /alerts` again before showing "no video". Do not try to open `snapshot_path`; that path exists only on the Jetson.
 
 ---
 
@@ -594,7 +611,7 @@ SOS and alerts with severity `high` or `critical` are sent to every sharing guar
   "ok": true,
   "mqtt": { "host": "emqx", "connected": true, "error": "" },
   "ride": "ride-1842",
-  "livekit": { "url": "ws://YOUR_VPS_IP:7880", "configured": true, "mode": "livekit" }
+  "livekit": { "url": "ws://YOUR_VPS_IP:7880", "configured": true, "mode": "livekit", "watch": "webrtc" }
 }
 ```
 
@@ -604,7 +621,7 @@ Use this to confirm the API is up. The app does not need to poll it.
 
 ## Guardian recordings and snaps
 
-These are what the guardian starts. They are nrot alert clips. Alert clips stay on `alerts[].clipId`.
+These are what the guardian starts. They are not alert clips. Alert clips stay on `alerts[].clipId`.
 
 `POST /v1/rides/{rideId}/recordings`
 

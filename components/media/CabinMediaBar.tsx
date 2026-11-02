@@ -4,12 +4,11 @@ import { Image } from "expo-image";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
 
 import { CabinTalkPublisher } from "@/components/media/CabinTalkPublisher";
-import {
-  CabinWatchPlayer,
-  type CabinWatchPlayerHandle,
-} from "@/components/media/CabinWatchPlayer";
+import { CabinWatchPlayer, type WatchLayout } from "@/components/media/CabinWatchPlayer";
+import { StreamReading } from "@/components/media/StreamReading";
 import { SnapShotFly, type FlyRect } from "@/components/media/SnapShotFly";
 import { AppText } from "@/components/ui/AppText";
+import { Segmented } from "@/components/ui/Segmented";
 import { Camera, CircleDot, Ear, Mic, Video } from "@/components/ui/icons";
 import { ApiError } from "@/services/api/http";
 import { bustMediaUrl } from "@/services/api/media";
@@ -18,12 +17,14 @@ import { ensureMicrophonePermission } from "@/services/media/micPermission";
 import { useTheme } from "@/providers/ThemeProvider";
 import { useReduceMotion } from "@/hooks/useReduceMotion";
 import { useRideStore } from "@/stores/useRideStore";
-import type { GuardianRecording, MediaChannel } from "@/types/domain";
+import type { MediaChannel } from "@/types/domain";
 import { friendlyActionError } from "@/utils/errors";
 import { notificationFeedback, selectionFeedback } from "@/utils/haptics";
 
 type Props = {
+  /** Camera a snapshot will save. Driver or cabin, never both. */
   channel: MediaChannel;
+  onChannelChange: (channel: MediaChannel) => void;
 };
 
 type Flight = { uri: string; from: FlyRect; to: FlyRect; token: number };
@@ -41,17 +42,15 @@ function measureWindow(node: HostRef): Promise<FlyRect> {
   });
 }
 
-export function CabinMediaBar({ channel }: Props) {
+export function CabinMediaBar({ channel, onChannelChange }: Props) {
   const { colors } = useTheme();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const broadHeight = Math.max(420, Math.round(screenHeight * 0.62));
   const reduceMotion = useReduceMotion();
   const videoSession = useRideStore((state) => state.videoSession);
   const talkSession = useRideStore((state) => state.talkSession);
   const frameCms = useRideStore((state) => state.frameCms);
   const frameDms = useRideStore((state) => state.frameDms);
-  const publisherOnline = useRideStore((state) => state.publisherOnline);
-  const deviceState = useRideStore((state) => state.deviceState);
+  const activeRecording = useRideStore((state) => state.activeRecording);
   const snapshots = useRideStore((state) => state.snapshots);
   const startWatch = useRideStore((state) => state.startWatch);
   const stopWatch = useRideStore((state) => state.stopWatch);
@@ -59,10 +58,7 @@ export function CabinMediaBar({ channel }: Props) {
   const stopTalk = useRideStore((state) => state.stopTalk);
   const startRecording = useRideStore((state) => state.startRecording);
   const stopRecording = useRideStore((state) => state.stopRecording);
-  const addPhoneClip = useRideStore((state) => state.addPhoneClip);
   const takeSnapshot = useRideStore((state) => state.takeSnapshot);
-
-  const playerRef = useRef<CabinWatchPlayerHandle>(null);
 
   const wrapRef = useRef<HostRef | null>(null);
   const stageRef = useRef<HostRef | null>(null);
@@ -71,7 +67,7 @@ export function CabinMediaBar({ channel }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
-  const [liveRec, setLiveRec] = useState(false);
+  const [watchLayout, setWatchLayout] = useState<WatchLayout>("both");
   const [speakBlocked, setSpeakBlocked] = useState<string | null>(null);
   const [flight, setFlight] = useState<Flight | null>(null);
   const [frozen, setFrozen] = useState(false);
@@ -189,52 +185,26 @@ export function CabinMediaBar({ channel }: Props) {
     boxScale.value = withSequence(withTiming(1.06, { duration: 120 }), withSpring(1, { damping: 14, stiffness: 220 }));
   };
 
-  const waitForPlayer = async () => {
-    const started = Date.now();
-    while (Date.now() - started < 8000) {
-      if (playerRef.current) return playerRef.current;
-      await new Promise((resolve) => setTimeout(resolve, 80));
-    }
-    throw new Error("Live video isn’t open yet.");
-  };
-
-  const finishLiveRecording = async () => {
-    try {
-      const uri = await playerRef.current?.stopLocalRecord();
-      if (uri) {
-        const now = Date.now();
-        const clip: GuardianRecording = {
-          id: `phone-${now}`,
-          rideId: useRideStore.getState().rideId,
-          guardianId: "",
-          status: "ready",
-          startedAt: now,
-          endedAt: now,
-          videoUrl: uri,
-          audio: true,
-        };
-        addPhoneClip(clip);
-      }
-      if (useRideStore.getState().activeRecording?.status === "recording") {
-        void stopRecording().catch(() => undefined);
-      }
-    } finally {
-      setLiveRec(false);
-    }
-  };
+  useEffect(() => {
+    if (!videoSession || videoSession.mode !== "livekit" || !videoSession.expiresAt) return;
+    const delay = videoSession.expiresAt - Date.now() - 60_000;
+    const timer = setTimeout(() => {
+      void startWatch().catch(() => undefined);
+    }, Math.max(5_000, delay));
+    return () => clearTimeout(timer);
+  }, [startWatch, videoSession]);
 
   const onWatch = () =>
     run("watch", async () => {
       if (watching) {
-        if (liveRec) await finishLiveRecording();
+        if (activeRecording?.status === "recording") await stopRecording();
         await stopWatch();
         setListening(false);
         setNote("Watch off. Stills keep updating.");
         return;
       }
       await startWatch();
-      const online = useRideStore.getState().publisherOnline;
-      setNote(online ? "Live cabin is on." : "Watch is on. Waiting for the car camera.");
+      setNote("Watch is on. Driver and cabin appear when the car publishes them.");
     });
 
   const onListen = () =>
@@ -251,17 +221,19 @@ export function CabinMediaBar({ channel }: Props) {
 
   const onRecord = () =>
     run("record", async () => {
-      if (liveRec) {
-        await finishLiveRecording();
-        setNote("Live recording saved.");
+      const status = useRideStore.getState().activeRecording?.status;
+      if (status === "recording") {
+        await stopRecording();
+        setNote("Recording stopped. The file appears in the list when the car finishes the upload.");
         return;
       }
-      if (!useRideStore.getState().videoSession) await startWatch();
-      const player = await waitForPlayer();
-      await player.startLocalRecord();
-      setLiveRec(true);
-      void startRecording().catch(() => undefined);
-      setNote("Recording live video.");
+      await startRecording();
+      const next = useRideStore.getState().activeRecording;
+      setNote(
+        next?.status === "recording"
+          ? "Recording the cabin camera and microphone."
+          : "The car accepted the recording. It shows in the list below.",
+      );
     });
 
   const onSnap = () =>
@@ -341,7 +313,11 @@ export function CabinMediaBar({ channel }: Props) {
       }
     });
 
-  const offline = !publisherOnline || deviceState === "offline";
+  const recordingNow = activeRecording?.status === "recording";
+  const frameHeight =
+    watchLayout === "both"
+      ? Math.max(520, Math.round(screenHeight * 0.72))
+      : Math.max(280, Math.round(screenHeight * 0.46));
 
   return (
     <View
@@ -360,28 +336,42 @@ export function CabinMediaBar({ channel }: Props) {
       >
         {watching && videoSession ? (
           <CabinWatchPlayer
-            ref={playerRef}
             session={videoSession}
             listen={listening}
-            fallbackFrame={frameCms ?? frameDms}
-            height={broadHeight}
+            layout={watchLayout}
+            selected={channel}
+            onSelect={onChannelChange}
+            driverFrame={frameDms}
+            cabinFrame={frameCms}
+            height={frameHeight}
             broad
-            onLocalRecordingChange={setLiveRec}
           />
         ) : (
           <View style={[styles.stage, styles.idle]}>
-            <AppText variant="strong">Cabin</AppText>
+            <AppText variant="strong">Cameras</AppText>
             <AppText variant="caption" style={{ textAlign: "center" }}>
-              Tap Watch for live video. Snap saves the current still.
+              Tap Watch for the driver and cabin cameras. Snap saves the {channelLabel.toLowerCase()} still on the server.
             </AppText>
           </View>
         )}
       </View>
 
-      {watching && offline ? (
-        <AppText variant="caption" style={{ color: colors.amber }}>
-          Car camera is offline. Live video starts when it connects.
-        </AppText>
+      <StreamReading layout={watching ? watchLayout : "both"} />
+
+      {watching ? (
+        <Segmented
+          value={watchLayout}
+          onChange={(id) => {
+            const next = id as WatchLayout;
+            setWatchLayout(next);
+            if (next === "dms" || next === "cms") onChannelChange(next);
+          }}
+          items={[
+            { id: "both", label: "Both" },
+            { id: "dms", label: "Driver" },
+            { id: "cms", label: "Cabin" },
+          ]}
+        />
       ) : null}
 
       <View style={styles.row}>
@@ -404,14 +394,14 @@ export function CabinMediaBar({ channel }: Props) {
           icon={<Ear size={20} color={listening ? colors.signal : colors.ink} strokeWidth={1.75} />}
         />
         <Control
-          label={liveRec ? "Stop" : "Record"}
+          label={recordingNow ? "Stop" : "Record"}
           busy={busy === "record"}
-          active={liveRec}
+          active={recordingNow}
           danger
           colors={colors}
           styles={styles}
           onPress={onRecord}
-          icon={<CircleDot size={20} color={liveRec ? colors.danger : colors.ink} strokeWidth={1.75} />}
+          icon={<CircleDot size={20} color={recordingNow ? colors.danger : colors.ink} strokeWidth={1.75} />}
         />
         <Control
           label="Snap"
@@ -456,10 +446,12 @@ export function CabinMediaBar({ channel }: Props) {
           <AppText variant="strong" style={{ fontSize: 15 }}>
             {boxUri ? "Latest snap" : "Snaps"}
           </AppText>
-          <AppText variant="caption" numberOfLines={2}>
+          <AppText variant="caption" numberOfLines={3}>
             {boxUri
-              ? `${snapshots[0]?.channel === "cms" ? "Cabin" : "Driver"} still`
-              : `Snap saves the ${channelLabel.toLowerCase()} still here.`}
+              ? `${snapshots[0]?.channel === "cms" ? "Cabin" : "Driver"} still from the server`
+              : watching
+                ? `Snap saves the server's latest ${channelLabel.toLowerCase()} still. Watch pauses new stills.`
+                : `Snap saves the ${channelLabel.toLowerCase()} camera on the server. Tap a picture to choose it.`}
           </AppText>
         </View>
       </View>
