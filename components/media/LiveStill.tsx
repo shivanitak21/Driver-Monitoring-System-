@@ -46,8 +46,7 @@ export function LiveStill({
     () =>
       StyleSheet.create({
         frame: {
-          flex: embedded ? 1 : undefined,
-          height: embedded ? undefined : height,
+          height,
           borderRadius: embedded ? 0 : 24,
           overflow: "hidden",
           backgroundColor: "#0C0D10",
@@ -82,7 +81,7 @@ export function LiveStill({
         <Image
           source={{ uri }}
           style={styles.image}
-          contentFit="cover"
+          contentFit={embedded ? "contain" : "cover"}
           transition={120}
           cachePolicy="none"
           recyclingKey={`${uri}-${reloadToken ?? frame?.at ?? 0}`}

@@ -10,7 +10,59 @@ import type { AnalysisSide, MediaChannel } from "@/types/domain";
 
 type Layout = "both" | MediaChannel;
 
-function reading(side: AnalysisSide | null | undefined): string | null {
+export type ReadingTone = "plain" | "ok" | "caution" | "danger";
+
+const DANGER_TEXT =
+  /asleep|sleeping|unconscious|eyes closed|passed out|slumped|no driver|weapon|\bsmoke\b|panic|fight|altercation|unattended|seizure/;
+
+const CAUTION_TEXT =
+  /on a call|on call|phone call|calling|video call|looking away|looks away|looked away|looking aside|looking down|looking up|looking at (the |a )?phone|not looking|eyes off|head turned|turned away|facing away|looking (left|right|back)|distract|texting|eating|smoking|drinking|yawning|drowsy|sleepy|phone|cigarette|reaching|lying|argument/;
+
+function observationText(value: unknown): string {
+  if (typeof value === "string") return value.toLowerCase();
+  if (Array.isArray(value)) return value.map(observationText).join(" ");
+  if (value && typeof value === "object") return Object.values(value).map(observationText).join(" ");
+  return "";
+}
+
+/** Light wash behind the line. Plain stays unboxed. */
+export function readingTone(side: AnalysisSide | null | undefined): ReadingTone {
+  if (!side) return "plain";
+  const spoken = [side.description, side.scene, cameraReading(side) ?? ""].join(" ").toLowerCase();
+  const hazards = side.hazards.map((item) => item.toLowerCase()).filter(Boolean);
+  const noted = observationText(side.observations);
+  const text = `${spoken} ${hazards.join(" ")} ${noted}`;
+  const observations = side.observations ?? {};
+  const aggression = String(observations.aggression ?? "").toLowerCase();
+  const gaze = typeof observations.gaze === "string" ? observations.gaze.toLowerCase() : "";
+
+  const danger =
+    aggression === "panic" ||
+    observations.weaponOrSmoke === true ||
+    observations.childUnattended === true ||
+    hazards.some((item) => DANGER_TEXT.test(item)) ||
+    DANGER_TEXT.test(text);
+  if (danger) return "danger";
+
+  const caution =
+    aggression === "argument" ||
+    observations.viewBlocked === true ||
+    observations.cameraBlocked === true ||
+    observations.handsOnWheel === false ||
+    (gaze !== "" && gaze !== "forward") ||
+    hazards.length > 0 ||
+    CAUTION_TEXT.test(text);
+  if (caution) return "caution";
+
+  const clear =
+    aggression === "calm" ||
+    observations.handsOnWheel === true ||
+    gaze === "forward";
+  if (clear && hazards.length === 0) return "ok";
+  return "plain";
+}
+
+export function cameraReading(side: AnalysisSide | null | undefined): string | null {
   if (!side) return null;
   const description = side.description?.trim();
   if (description) return description;
@@ -32,7 +84,7 @@ function meta(side: AnalysisSide | null | undefined): string | null {
 
 function Row({ title, side }: { title: string; side: AnalysisSide | null | undefined }) {
   const { colors } = useTheme();
-  const text = reading(side);
+  const text = cameraReading(side);
   if (!text) return null;
   return (
     <View style={{ gap: 2 }}>
@@ -52,8 +104,8 @@ export function StreamReading({ layout }: { layout: Layout }) {
   const { colors } = useTheme();
   const analysis = useRideStore((state) => state.analysis);
   const analysisError = useRideStore((state) => state.analysisError);
-  const showDriver = (layout === "both" || layout === "dms") && Boolean(reading(analysis?.dms));
-  const showCabin = (layout === "both" || layout === "cms") && Boolean(reading(analysis?.cms));
+  const showDriver = (layout === "both" || layout === "dms") && Boolean(cameraReading(analysis?.dms));
+  const showCabin = (layout === "both" || layout === "cms") && Boolean(cameraReading(analysis?.cms));
 
   const styles = useMemo(
     () =>

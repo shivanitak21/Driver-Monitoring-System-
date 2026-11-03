@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, w
 import { CabinTalkPublisher } from "@/components/media/CabinTalkPublisher";
 import { CabinWatchPlayer, type WatchLayout } from "@/components/media/CabinWatchPlayer";
 import { LiveStill } from "@/components/media/LiveStill";
-import { StreamReading } from "@/components/media/StreamReading";
+import { cameraReading, readingTone, type ReadingTone } from "@/components/media/StreamReading";
 import { SnapShotFly, type FlyRect } from "@/components/media/SnapShotFly";
 import { AppText } from "@/components/ui/AppText";
 import { Camera, CircleDot, Ear, Mic, Video } from "@/components/ui/icons";
@@ -35,6 +35,15 @@ const VIEWS = [
   { id: "dms", label: "Driver" },
 ] as const;
 
+const PANE_GAP = 4;
+const WIDE = 16 / 9;
+
+const READING_WASH: Record<Exclude<ReadingTone, "plain">, string> = {
+  ok: "rgba(215,247,107,0.18)",
+  caution: "rgba(230,177,90,0.22)",
+  danger: "rgba(255,69,58,0.22)",
+};
+
 function measureWindow(node: HostRef): Promise<FlyRect> {
   return new Promise((resolve, reject) => {
     node.measureInWindow((x, y, width, height) => {
@@ -46,12 +55,14 @@ function measureWindow(node: HostRef): Promise<FlyRect> {
 
 export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
   const { colors } = useTheme();
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { width: screenWidth } = useWindowDimensions();
   const reduceMotion = useReduceMotion();
   const videoSession = useRideStore((state) => state.videoSession);
   const talkSession = useRideStore((state) => state.talkSession);
   const frameCms = useRideStore((state) => state.frameCms);
   const frameDms = useRideStore((state) => state.frameDms);
+  const analysis = useRideStore((state) => state.analysis);
+  const analysisError = useRideStore((state) => state.analysisError);
   const activeRecording = useRideStore((state) => state.activeRecording);
   const startWatch = useRideStore((state) => state.startWatch);
   const stopWatch = useRideStore((state) => state.stopWatch);
@@ -71,15 +82,21 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
   const [layout, setLayout] = useState<WatchLayout>("both");
   const [channel, setChannel] = useState<MediaChannel>("dms");
   const [flight, setFlight] = useState<Flight | null>(null);
+  const [aspect, setAspect] = useState({ driver: WIDE, cabin: WIDE });
 
   const boxScale = useSharedValue(1);
   const watching = Boolean(videoSession);
   const speaking = Boolean(talkSession);
   const recordingNow = activeRecording?.status === "recording";
-  const stageHeight = Math.max(
-    layout === "both" ? 440 : 360,
-    Math.min(620, Math.round(screenHeight * (layout === "both" ? 0.58 : 0.5))),
-  );
+  const driverH = Math.round(screenWidth / (watching ? WIDE : aspect.driver));
+  const cabinH = Math.round(screenWidth / (watching ? WIDE : aspect.cabin));
+  const showDriver = layout !== "cms";
+  const showCabin = layout !== "dms";
+  const stageHeight = (showDriver ? driverH : 0) + (showCabin ? cabinH : 0) + (showDriver && showCabin ? PANE_GAP : 0);
+  const driverText = showDriver ? cameraReading(analysis?.dms) : null;
+  const cabinText = showCabin ? cameraReading(analysis?.cms) : null;
+  const driverTone = readingTone(showDriver ? analysis?.dms : null);
+  const cabinTone = readingTone(showCabin ? analysis?.cms : null);
 
   useEffect(() => {
     if (!videoSession || videoSession.mode !== "livekit" || !videoSession.expiresAt) return;
@@ -101,13 +118,22 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
           overflow: "hidden",
           backgroundColor: "#0C0D10",
         },
-        stills: { flex: 1, gap: 2, backgroundColor: "#0C0D10" },
-        switchSlot: {
+        stills: { flex: 1, gap: PANE_GAP, backgroundColor: "#000" },
+        switchSlot: { alignItems: "center" },
+        reading: {
           position: "absolute",
-          top: 12,
-          left: 0,
-          right: 0,
+          left: 16,
+          right: 16,
           alignItems: "center",
+        },
+        readingText: {
+          color: INK,
+          fontSize: 11,
+          lineHeight: 14,
+          textAlign: "center",
+          textShadowColor: "rgba(0,0,0,0.85)",
+          textShadowOffset: { width: 0, height: 1 },
+          textShadowRadius: 3,
         },
         switchTrack: {
           flexDirection: "row",
@@ -126,8 +152,8 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
         switchOn: { backgroundColor: colors.lime },
         rail: {
           position: "absolute",
-          top: 64,
-          bottom: 78,
+          top: 16,
+          bottom: 16,
           justifyContent: "center",
           gap: 12,
         },
@@ -144,10 +170,6 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
         orbOn: { backgroundColor: colors.lime },
         orbDanger: { backgroundColor: colors.danger },
         watchSlot: {
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 16,
           alignItems: "center",
         },
         watch: {
@@ -279,8 +301,10 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
       }
     });
 
-  const showDriver = layout !== "cms";
-  const showCabin = layout !== "dms";
+  const onAspect = (which: "driver" | "cabin", ratio: number) => {
+    if (!Number.isFinite(ratio) || ratio < 0.4 || ratio > 3) return;
+    setAspect((current) => (Math.abs(current[which] - ratio) < 0.02 ? current : { ...current, [which]: ratio }));
+  };
 
   return (
     <View
@@ -290,6 +314,31 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
       style={styles.wrap}
       collapsable={false}
     >
+      <View style={styles.switchSlot}>
+        <View style={styles.switchTrack}>
+          {VIEWS.map((item) => {
+            const selected = layout === item.id;
+            return (
+              <Pressable
+                key={item.id}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                accessibilityLabel={item.label}
+                onPress={() => {
+                  void selectionFeedback();
+                  onLayout(item.id);
+                }}
+                style={[styles.switchItem, selected && styles.switchOn]}
+              >
+                <AppText variant="caption" style={{ color: selected ? colors.limeInk : INK, fontSize: 13 }}>
+                  {item.label}
+                </AppText>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
       <View
         ref={(node) => {
           stageRef.current = node as HostRef | null;
@@ -304,57 +353,33 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
             layout={layout}
             selected={channel}
             onSelect={setChannel}
+            onAspect={onAspect}
             driverFrame={frameDms}
             cabinFrame={frameCms}
+            driverPane={showDriver ? driverH : 0}
+            cabinPane={showCabin ? cabinH : 0}
             height={stageHeight}
             broad
           />
         ) : (
           <View style={styles.stills}>
             {showDriver ? (
-              <LiveStill
-                frame={frameDms}
-                label="Driver"
-                embedded
-                hideTag={layout !== "both"}
-                tagClearance={layout === "both" ? 48 : 0}
-                reloadToken={reloadToken}
-              />
+              <LiveStill frame={frameDms} label="Driver" height={driverH} embedded hideTag={layout !== "both"} reloadToken={reloadToken} />
             ) : null}
             {showCabin ? (
-              <LiveStill frame={frameCms} label="Cabin" embedded hideTag={layout !== "both"} reloadToken={reloadToken} />
+              <LiveStill frame={frameCms} label="Cabin" height={cabinH} embedded hideTag={layout !== "both"} reloadToken={reloadToken} />
             ) : null}
           </View>
         )}
 
         <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-          <View pointerEvents="box-none" style={styles.switchSlot}>
-            <View style={styles.switchTrack}>
-              {VIEWS.map((item) => {
-                const selected = layout === item.id;
-                return (
-                  <Pressable
-                    key={item.id}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={item.label}
-                    onPress={() => {
-                      void selectionFeedback();
-                      onLayout(item.id);
-                    }}
-                    style={[styles.switchItem, selected && styles.switchOn]}
-                  >
-                    <AppText
-                      variant="caption"
-                      style={{ color: selected ? colors.limeInk : INK, fontSize: 13 }}
-                    >
-                      {item.label}
-                    </AppText>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
+          <ReadingLine
+            text={driverText}
+            tone={driverTone}
+            bottom={showCabin ? cabinH + PANE_GAP + 10 : 10}
+            styles={styles}
+          />
+          <ReadingLine text={cabinText} tone={cabinTone} bottom={10} styles={styles} />
 
           <View pointerEvents="box-none" style={[styles.rail, styles.railLeft]}>
             <Orb
@@ -404,35 +429,35 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
             />
           </View>
 
-          <View pointerEvents="box-none" style={styles.watchSlot}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={watching ? "Stop watch" : "Watch"}
-              onPress={onWatch}
-              disabled={busy === "watch"}
-              style={[styles.watch, watching && styles.watchOn, busy === "watch" && { opacity: 0.55 }]}
-            >
-              {busy === "watch" ? (
-                <ActivityIndicator color={INK} />
-              ) : (
-                <Video size={18} color={watching ? colors.onDanger : INK} strokeWidth={1.75} />
-              )}
-              <AppText variant="caption" style={{ color: watching ? colors.onDanger : INK }}>
-                {watching ? "Stop" : "Watch"}
-              </AppText>
-            </Pressable>
-          </View>
         </View>
       </View>
 
-      {note ? (
+      <View style={styles.watchSlot}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={watching ? "Stop watch" : "Watch"}
+          onPress={onWatch}
+          disabled={busy === "watch"}
+          style={[styles.watch, watching && styles.watchOn, busy === "watch" && { opacity: 0.55 }]}
+        >
+          {busy === "watch" ? (
+            <ActivityIndicator color={INK} />
+          ) : (
+            <Video size={18} color={watching ? colors.onDanger : INK} strokeWidth={1.75} />
+          )}
+          <AppText variant="caption" style={{ color: watching ? colors.onDanger : INK }}>
+            {watching ? "Stop" : "Watch"}
+          </AppText>
+        </Pressable>
+      </View>
+
+      {note || analysisError ? (
         <AppText variant="caption" style={{ color: colors.amber }} numberOfLines={2}>
-          {note}
+          {note || analysisError}
         </AppText>
       ) : null}
 
       {speaking && talkSession ? <CabinTalkPublisher session={talkSession} /> : null}
-      <StreamReading layout={layout} />
 
       {flight ? (
         <SnapShotFly
@@ -446,6 +471,33 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
           }}
         />
       ) : null}
+    </View>
+  );
+}
+
+function ReadingLine({
+  text,
+  tone,
+  bottom,
+  styles,
+}: {
+  text: string | null;
+  tone: ReadingTone;
+  bottom: number;
+  styles: { reading: object; readingText: object };
+}) {
+  if (!text) return null;
+  const wash = tone === "plain" ? null : READING_WASH[tone];
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        styles.reading,
+        { bottom },
+        wash ? { backgroundColor: wash, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 } : null,
+      ]}
+    >
+      <AppText style={styles.readingText}>{text}</AppText>
     </View>
   );
 }

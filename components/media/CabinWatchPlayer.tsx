@@ -26,6 +26,10 @@ type Props = {
   cabinFrame?: LiveFrame | null;
   height?: number;
   broad?: boolean;
+  /** Pixel weights so each camera pane matches its picture. */
+  driverPane?: number;
+  cabinPane?: number;
+  onAspect?: (channel: "driver" | "cabin", ratio: number) => void;
 };
 
 export function CabinWatchPlayer({
@@ -38,6 +42,9 @@ export function CabinWatchPlayer({
   cabinFrame,
   height = 420,
   broad = false,
+  driverPane = 1,
+  cabinPane = 1,
+  onAspect,
 }: Props) {
   const webRef = useRef<WebView>(null);
   const pageBase = "http://localhost";
@@ -61,9 +68,9 @@ export function CabinWatchPlayer({
 
   useEffect(() => {
     webRef.current?.injectJavaScript(
-      `try{window.__vmsSetLayout&&window.__vmsSetLayout(${JSON.stringify(htmlLayout)});window.__vmsSetSelected&&window.__vmsSetSelected(${JSON.stringify(htmlSelected)});}catch(e){};true;`,
+      `try{window.__vmsSetLayout&&window.__vmsSetLayout(${JSON.stringify(htmlLayout)});window.__vmsSetSelected&&window.__vmsSetSelected(${JSON.stringify(htmlSelected)});window.__vmsSetPanes&&window.__vmsSetPanes(${driverPane},${cabinPane});}catch(e){};true;`,
     );
-  }, [htmlLayout, htmlSelected]);
+  }, [cabinPane, driverPane, htmlLayout, htmlSelected]);
 
   const styles = useMemo(
     () =>
@@ -74,7 +81,7 @@ export function CabinWatchPlayer({
           overflow: "hidden",
           backgroundColor: "#000",
         },
-        web: { flex: 1, backgroundColor: "#000" },
+        web: { height, backgroundColor: "#000" },
         fallback: {
           flex: 1,
           alignItems: "center",
@@ -120,10 +127,21 @@ export function CabinWatchPlayer({
           try {
             const message = JSON.parse(event.nativeEvent.data) as {
               type?: string;
-              channel?: MediaChannel;
+              channel?: MediaChannel | "driver" | "cabin";
+              width?: number;
+              height?: number;
             };
             if (message.type === "select" && (message.channel === "dms" || message.channel === "cms")) {
               onSelect(message.channel);
+            }
+            if (
+              message.type === "aspect" &&
+              (message.channel === "driver" || message.channel === "cabin") &&
+              message.width &&
+              message.height &&
+              message.height > 0
+            ) {
+              onAspect?.(message.channel, message.width / message.height);
             }
           } catch {
             // Ignore malformed player messages.

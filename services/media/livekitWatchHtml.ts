@@ -29,16 +29,18 @@ export function buildLiveKitWatchHtml(options: {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <style>
-    html, body { margin: 0; height: 100%; background: #090A0C; font-family: -apple-system, system-ui, sans-serif; }
-    #stage { box-sizing: border-box; height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 8px; }
+    html, body { margin: 0; height: 100%; background: #000; font-family: -apple-system, system-ui, sans-serif; }
+    #stage { box-sizing: border-box; height: 100%; display: flex; flex-direction: column; gap: 4px; padding: 0; }
     button.pane {
       display: block; width: 100%; padding: 0; margin: 0; appearance: none; -webkit-appearance: none;
-      position: relative; flex: 1; min-height: 0; border-radius: 18px; overflow: hidden;
-      background: #000; border: 1.5px solid rgba(255,255,255,0.14); color: inherit; font: inherit; text-align: left;
+      position: relative; flex: 1 1 auto; min-height: 0; border-radius: 0; overflow: hidden;
+      background: #000; border: 0; color: inherit; font: inherit; text-align: left;
     }
     html[data-layout="driver"] .pane-cabin, html[data-layout="cabin"] .pane-driver { display: none; }
-    html[data-selected="driver"] .pane-driver, html[data-selected="cabin"] .pane-cabin { border-color: #D7F76B; }
-    video, .poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+    html[data-selected="driver"] .pane-driver, html[data-selected="cabin"] .pane-cabin { box-shadow: inset 0 0 0 2px #D7F76B; }
+    video, .poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center; }
+    .poster { z-index: 0; background: #000; }
+    video { z-index: 1; background: transparent; }
     .tag {
       position: absolute; top: 10px; display: flex; align-items: center; gap: 6px;
       padding: 5px 10px; border-radius: 999px; background: rgba(0,0,0,0.55); color: #F5F6F7;
@@ -202,6 +204,19 @@ export function buildLiveKitWatchHtml(options: {
       window.__vmsSetSelected = function (name) {
         document.documentElement.setAttribute("data-selected", name === "cabin" ? "cabin" : "driver");
       };
+      window.__vmsSetPanes = function () {};
+      function noteAspect(which, el) {
+        var w = el.videoWidth || el.naturalWidth || 0;
+        var h = el.videoHeight || el.naturalHeight || 0;
+        if (w < 2 || h < 2) return;
+        post({ type: "aspect", channel: which, width: w, height: h });
+      }
+      ["driver", "cabin"].forEach(function (which) {
+        var video = document.getElementById("video-" + which);
+        var poster = document.getElementById("poster-" + which);
+        if (video) video.addEventListener("loadedmetadata", function () { noteAspect(which, video); });
+        if (poster) poster.addEventListener("load", function () { noteAspect(which, poster); });
+      });
       document.getElementById("pane-driver").addEventListener("click", function () {
         window.__vmsSetSelected("driver");
         post({ type: "select", channel: "dms" });
