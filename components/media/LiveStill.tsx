@@ -15,12 +15,20 @@ export function LiveStill({
   height = 220,
   /** Bump on each poll so expo-image reloads even if `at` is unchanged. */
   reloadToken,
+  /** Fill a parent frame: no chrome, name only. */
+  embedded = false,
+  /** Extra top space so a control above the picture does not cover the name. */
+  tagClearance = 0,
+  hideTag = false,
 }: {
   frame: LiveFrame | null;
   label: string;
   staleMs?: number;
   height?: number;
   reloadToken?: number;
+  embedded?: boolean;
+  tagClearance?: number;
+  hideTag?: boolean;
 }) {
   const { colors } = useTheme();
   const [failed, setFailed] = useState(false);
@@ -38,28 +46,34 @@ export function LiveStill({
     () =>
       StyleSheet.create({
         frame: {
-          height,
-          borderRadius: 24,
+          flex: embedded ? 1 : undefined,
+          height: embedded ? undefined : height,
+          borderRadius: embedded ? 0 : 24,
           overflow: "hidden",
-          backgroundColor: colors.bgSoft,
-          borderWidth: StyleSheet.hairlineWidth,
+          backgroundColor: "#0C0D10",
+          borderWidth: embedded ? 0 : StyleSheet.hairlineWidth,
           borderColor: colors.line,
           justifyContent: "center",
         },
         image: { width: "100%", height: "100%" },
         tag: {
           position: "absolute",
-          left: 12,
-          bottom: 12,
-          paddingHorizontal: 11,
-          paddingVertical: 7,
-          borderRadius: 12,
-          backgroundColor: colors.glass,
-          maxWidth: "90%",
+          left: embedded ? 0 : 12,
+          right: embedded ? 0 : undefined,
+          top: embedded ? 12 + tagClearance : undefined,
+          bottom: embedded ? undefined : 12,
+          alignItems: embedded ? "center" : undefined,
         },
-        empty: { padding: 18, gap: 6 },
+        tagPill: {
+          paddingHorizontal: 10,
+          paddingVertical: 5,
+          borderRadius: 999,
+          backgroundColor: "rgba(9,10,12,0.55)",
+          maxWidth: "70%",
+        },
+        empty: { padding: 18, alignItems: "center" },
       }),
-    [colors, height],
+    [colors.line, embedded, height, tagClearance],
   );
 
   return (
@@ -77,19 +91,22 @@ export function LiveStill({
         />
       ) : (
         <View style={styles.empty}>
-          <AppText variant="strong">{label}</AppText>
-          <AppText variant="caption">
-            {failed ? "Couldn’t load this still." : "Waiting for the car camera."}
+          <AppText variant="caption" style={{ color: "#F5F6F7" }}>
+            {failed ? "Couldn’t load" : label}
           </AppText>
         </View>
       )}
-      <View style={styles.tag}>
-        <AppText variant="caption" numberOfLines={1}>
-          {label}
-          {frame ? ` · ${clock(frame.at)}` : ""}
-          {stale ? " · stale" : " · live"}
-        </AppText>
-      </View>
+      {uri && !failed && !hideTag ? (
+        <View style={styles.tag} pointerEvents="none">
+          <View style={styles.tagPill}>
+            <AppText variant="caption" numberOfLines={1} style={{ color: "#F5F6F7" }}>
+              {label}
+              {!embedded && frame ? ` · ${clock(frame.at)}` : ""}
+              {!embedded ? (stale ? " · stale" : " · live") : ""}
+            </AppText>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }

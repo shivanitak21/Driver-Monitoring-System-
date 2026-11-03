@@ -9,7 +9,6 @@ import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { Segmented } from "@/components/ui/Segmented";
 import { useTheme, type Appearance } from "@/providers/ThemeProvider";
-import { isLiveApiEnabled, apiBaseUrl } from "@/services/api/config";
 import { useRideStore } from "@/stores/useRideStore";
 
 export function SettingsScreen() {
@@ -22,13 +21,7 @@ export function SettingsScreen() {
   const setShowDevice = useRideStore((state) => state.setShowDeviceLocation);
   const offline = useRideStore((state) => state.offlineOverride);
   const setOffline = useRideStore((state) => state.setOfflineOverride);
-  const connection = useRideStore((state) => state.connection);
-  const rideId = useRideStore((state) => state.rideId);
-  const deviceId = useRideStore((state) => state.deviceId);
-  const liveMode = useRideStore((state) => state.liveMode);
   const { colors, appearance, setAppearance } = useTheme();
-  const apiEnabled = isLiveApiEnabled();
-  const telemetryHost = apiEnabled ? apiBaseUrl().replace(/^https?:\/\//, "") : "";
   const [locationDenied, setLocationDenied] = useState(false);
   const locationGranted = Boolean(location?.granted);
   const cameraGranted = Boolean(camera?.granted);
@@ -45,21 +38,7 @@ export function SettingsScreen() {
         : null;
 
   return (
-    <Page title="Settings" subtitle="On this phone" back>
-      <AppText variant="body">
-        {apiEnabled
-          ? `Guardian API ${telemetryHost}. Ride ${rideId} · device ${deviceId}. REST + live socket. MQTT stays unused on the phone.`
-          : "Set EXPO_PUBLIC_TELEMETRY_URL to connect the guardian API. Until then, the ride, cabin, alerts, and family notices stay on this phone."}
-      </AppText>
-      {apiEnabled ? (
-        <AppText variant="caption" style={{ marginTop: 8 }}>
-          Link status: {liveMode ? connection : "idle"} · docs at /docs
-          {"\n"}Integrated: ride + live socket, telemetry, alerts/ack (+ startedAt), analysis, frames/live,
-          Watch (LiveKit driver + cabin video, cabin mic), Speak (guardian-mic), Record/Snap on the server,
-          history, clips, SOS, cabin, guardians/share, notices. Push-token client ready.
-        </AppText>
-      ) : null}
-
+    <Page title="Settings" back>
       <View style={styles.block}>
         <AppText variant="strong">Appearance</AppText>
         <Segmented
@@ -76,7 +55,7 @@ export function SettingsScreen() {
       <View style={[styles.group, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}>
         <PermissionRow
           title="Location"
-          body="Optional phone dot on the demo map. The live vehicle stays on the ride coordinates."
+          body="Shows your phone on the map."
           granted={Boolean(location?.granted)}
           denied={locationDenied || location?.status === "denied"}
           primary={primaryPermission === "location"}
@@ -119,9 +98,8 @@ export function SettingsScreen() {
       </View>
 
       <View style={[styles.card, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}>
-        <AppText variant="body">Cabin monitoring for this ride.</AppText>
         <View style={styles.toggleRow}>
-          <AppText variant="strong">{consent ? "Allowed for this ride" : "Not allowed"}</AppText>
+          <AppText variant="strong">Cabin monitoring</AppText>
           <Switch
             testID="cabin-consent"
             value={consent}
@@ -192,7 +170,7 @@ function PermissionRow({
 }
 
 const styles = StyleSheet.create({
-  block: { marginTop: 22, gap: 10 },
+  block: { gap: 10 },
   group: { marginTop: 14, borderRadius: 22, borderWidth: 1, overflow: "hidden" },
   card: { marginTop: 14, padding: 16, borderRadius: 22, borderWidth: 1, gap: 8 },
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
@@ -203,6 +181,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    marginTop: 8,
+    marginTop: 0,
   },
 });

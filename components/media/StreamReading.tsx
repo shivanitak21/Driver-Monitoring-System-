@@ -10,15 +10,15 @@ import type { AnalysisSide, MediaChannel } from "@/types/domain";
 
 type Layout = "both" | MediaChannel;
 
-function line(side: AnalysisSide | null | undefined): string {
-  if (!side) return "Waiting for a reading from the car.";
+function reading(side: AnalysisSide | null | undefined): string | null {
+  if (!side) return null;
   const description = side.description?.trim();
   if (description) return description;
   const scene = side.scene?.trim();
   if (scene && scene.toLowerCase() !== "short") return scene;
   const hazards = side.hazards.filter(Boolean);
   if (hazards.length) return hazards.join(", ");
-  return "The car sent a reading without a scene description.";
+  return null;
 }
 
 function meta(side: AnalysisSide | null | undefined): string | null {
@@ -32,13 +32,15 @@ function meta(side: AnalysisSide | null | undefined): string | null {
 
 function Row({ title, side }: { title: string; side: AnalysisSide | null | undefined }) {
   const { colors } = useTheme();
+  const text = reading(side);
+  if (!text) return null;
   return (
     <View style={{ gap: 2 }}>
       <AppText variant="caption" style={{ color: colors.signal }}>
         {title}
       </AppText>
       <AppText variant="body" style={{ fontSize: 15, lineHeight: 20 }}>
-        {line(side)}
+        {text}
       </AppText>
       {meta(side) ? <AppText variant="caption">{meta(side)}</AppText> : null}
     </View>
@@ -50,8 +52,8 @@ export function StreamReading({ layout }: { layout: Layout }) {
   const { colors } = useTheme();
   const analysis = useRideStore((state) => state.analysis);
   const analysisError = useRideStore((state) => state.analysisError);
-  const showDriver = layout === "both" || layout === "dms";
-  const showCabin = layout === "both" || layout === "cms";
+  const showDriver = (layout === "both" || layout === "dms") && Boolean(reading(analysis?.dms));
+  const showCabin = (layout === "both" || layout === "cms") && Boolean(reading(analysis?.cms));
 
   const styles = useMemo(
     () =>
@@ -61,6 +63,8 @@ export function StreamReading({ layout }: { layout: Layout }) {
       }),
     [colors.line],
   );
+
+  if (!analysisError && !showDriver && !showCabin) return null;
 
   return (
     <Glass radius={18}>

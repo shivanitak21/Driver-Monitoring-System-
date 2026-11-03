@@ -1,37 +1,33 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
-import { Image } from "expo-image";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
 
 import { CabinTalkPublisher } from "@/components/media/CabinTalkPublisher";
 import { CabinWatchPlayer, type WatchLayout } from "@/components/media/CabinWatchPlayer";
+import { LiveStill } from "@/components/media/LiveStill";
 import { StreamReading } from "@/components/media/StreamReading";
 import { SnapShotFly, type FlyRect } from "@/components/media/SnapShotFly";
 import { AppText } from "@/components/ui/AppText";
-import { Segmented } from "@/components/ui/Segmented";
 import { Camera, CircleDot, Ear, Mic, Video } from "@/components/ui/icons";
 import { ApiError } from "@/services/api/http";
 import { bustMediaUrl } from "@/services/api/media";
 import { saveRemoteImageToGallery } from "@/services/media/gallery";
 import { ensureMicrophonePermission } from "@/services/media/micPermission";
-import { useTheme } from "@/providers/ThemeProvider";
 import { useReduceMotion } from "@/hooks/useReduceMotion";
+import { useTheme } from "@/providers/ThemeProvider";
 import { useRideStore } from "@/stores/useRideStore";
 import type { MediaChannel } from "@/types/domain";
 import { friendlyActionError } from "@/utils/errors";
 import { notificationFeedback, selectionFeedback } from "@/utils/haptics";
-
-type Props = {
-  /** Camera a snapshot will save. Driver or cabin, never both. */
-  channel: MediaChannel;
-  onChannelChange: (channel: MediaChannel) => void;
-};
 
 type Flight = { uri: string; from: FlyRect; to: FlyRect; token: number };
 
 type HostRef = {
   measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) => void;
 };
+
+const INK = "#F5F6F7";
+const GLASS = "rgba(9,10,12,0.58)";
 
 function measureWindow(node: HostRef): Promise<FlyRect> {
   return new Promise((resolve, reject) => {
@@ -42,7 +38,7 @@ function measureWindow(node: HostRef): Promise<FlyRect> {
   });
 }
 
-export function CabinMediaBar({ channel, onChannelChange }: Props) {
+export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
   const { colors } = useTheme();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const reduceMotion = useReduceMotion();
@@ -51,7 +47,6 @@ export function CabinMediaBar({ channel, onChannelChange }: Props) {
   const frameCms = useRideStore((state) => state.frameCms);
   const frameDms = useRideStore((state) => state.frameDms);
   const activeRecording = useRideStore((state) => state.activeRecording);
-  const snapshots = useRideStore((state) => state.snapshots);
   const startWatch = useRideStore((state) => state.startWatch);
   const stopWatch = useRideStore((state) => state.stopWatch);
   const startTalk = useRideStore((state) => state.startTalk);
@@ -67,96 +62,100 @@ export function CabinMediaBar({ channel, onChannelChange }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
-  const [watchLayout, setWatchLayout] = useState<WatchLayout>("both");
-  const [speakBlocked, setSpeakBlocked] = useState<string | null>(null);
+  const [layout, setLayout] = useState<WatchLayout>("both");
+  const [channel, setChannel] = useState<MediaChannel>("dms");
   const [flight, setFlight] = useState<Flight | null>(null);
-  const [frozen, setFrozen] = useState(false);
-  const [frozenUri, setFrozenUri] = useState<string | null>(null);
-  const [pinned, setPinned] = useState<string | null>(null);
-  const revealUri = useRef<string | null>(null);
 
   const boxScale = useSharedValue(1);
-
   const watching = Boolean(videoSession);
   const speaking = Boolean(talkSession);
-  const latest = snapshots[0]?.imageUrl ?? null;
-  const boxUri = pinned ?? (frozen ? frozenUri : latest);
-  const channelLabel = channel === "cms" ? "Cabin" : "Driver";
+  const recordingNow = activeRecording?.status === "recording";
+  const stageHeight = Math.max(
+    layout === "both" ? 440 : 360,
+    Math.min(620, Math.round(screenHeight * (layout === "both" ? 0.58 : 0.5))),
+  );
 
   useEffect(() => {
-    if (pinned && latest === pinned) setPinned(null);
-  }, [latest, pinned]);
+    if (!videoSession || videoSession.mode !== "livekit" || !videoSession.expiresAt) return;
+    const delay = videoSession.expiresAt - Date.now() - 60_000;
+    const timer = setTimeout(() => {
+      void startWatch().catch(() => undefined);
+    }, Math.max(5_000, delay));
+    return () => clearTimeout(timer);
+  }, [startWatch, videoSession]);
 
   const styles = useMemo(
     () =>
       StyleSheet.create({
-        wrap: { gap: 16 },
+        wrap: { gap: 14 },
         stage: {
-          height: 220,
-          borderRadius: 22,
+          marginHorizontal: -20,
+          width: screenWidth,
+          borderRadius: 0,
           overflow: "hidden",
           backgroundColor: "#0C0D10",
         },
-        idle: {
+        stills: { flex: 1, gap: 2, backgroundColor: "#0C0D10" },
+        switchSlot: {
+          position: "absolute",
+          top: 12,
+          left: 0,
+          right: 0,
+          alignItems: "center",
+        },
+        switchTrack: {
+          flexDirection: "row",
+          width: 232,
+          padding: 3,
+          borderRadius: 999,
+          backgroundColor: GLASS,
+        },
+        switchItem: {
           flex: 1,
+          minHeight: 34,
+          borderRadius: 999,
           alignItems: "center",
           justifyContent: "center",
-          padding: 24,
-          gap: 6,
-          backgroundColor: colors.bgSoft,
         },
-        row: {
-          flexDirection: "row",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-        },
-        control: {
-          flex: 1,
-          alignItems: "center",
-          gap: 6,
-        },
-        circle: {
-          width: 52,
-          height: 52,
-          borderRadius: 26,
-          alignItems: "center",
+        switchOn: { backgroundColor: colors.lime },
+        rail: {
+          position: "absolute",
+          top: 64,
+          bottom: 78,
           justifyContent: "center",
-          backgroundColor: colors.bgRaised,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.line,
-        },
-        circleOn: {
-          backgroundColor: colors.limeSoft,
-          borderColor: "transparent",
-        },
-        circleDanger: {
-          backgroundColor: "rgba(255,59,48,0.14)",
-          borderColor: "transparent",
-        },
-        shelf: {
-          flexDirection: "row",
-          alignItems: "center",
           gap: 12,
-          padding: 10,
-          borderRadius: 18,
-          backgroundColor: colors.bgRaised,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.line,
         },
-        box: {
-          width: 72,
-          height: 54,
-          borderRadius: 12,
-          overflow: "hidden",
-          backgroundColor: colors.bgSoft,
+        railLeft: { left: 12 },
+        railRight: { right: 12 },
+        orb: {
+          width: 48,
+          height: 48,
+          borderRadius: 24,
           alignItems: "center",
           justifyContent: "center",
+          backgroundColor: GLASS,
         },
-        boxImage: { width: "100%", height: "100%" },
-        shelfText: { flex: 1, gap: 2 },
-        hint: { marginTop: -4 },
+        orbOn: { backgroundColor: colors.lime },
+        orbDanger: { backgroundColor: colors.danger },
+        watchSlot: {
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 16,
+          alignItems: "center",
+        },
+        watch: {
+          minHeight: 44,
+          paddingHorizontal: 16,
+          borderRadius: 999,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          backgroundColor: GLASS,
+        },
+        watchOn: { backgroundColor: colors.danger },
       }),
-    [colors],
+    [colors.danger, colors.lime, screenWidth],
   );
 
   const boxStyle = useAnimatedStyle(() => ({
@@ -176,72 +175,49 @@ export function CabinMediaBar({ channel, onChannelChange }: Props) {
     }
   };
 
-  const releaseBox = () => {
-    setFrozen(false);
-    setFrozenUri(null);
-  };
-
   const pulseBox = () => {
-    boxScale.value = withSequence(withTiming(1.06, { duration: 120 }), withSpring(1, { damping: 14, stiffness: 220 }));
+    boxScale.value = withSequence(withTiming(1.08, { duration: 120 }), withSpring(1, { damping: 14, stiffness: 220 }));
   };
 
-  useEffect(() => {
-    if (!videoSession || videoSession.mode !== "livekit" || !videoSession.expiresAt) return;
-    const delay = videoSession.expiresAt - Date.now() - 60_000;
-    const timer = setTimeout(() => {
-      void startWatch().catch(() => undefined);
-    }, Math.max(5_000, delay));
-    return () => clearTimeout(timer);
-  }, [startWatch, videoSession]);
+  const onLayout = (next: WatchLayout) => {
+    setLayout(next);
+    if (next === "dms" || next === "cms") setChannel(next);
+  };
 
   const onWatch = () =>
     run("watch", async () => {
       if (watching) {
-        if (activeRecording?.status === "recording") await stopRecording();
+        if (useRideStore.getState().activeRecording?.status === "recording") await stopRecording();
         await stopWatch();
         setListening(false);
-        setNote("Watch off. Stills keep updating.");
         return;
       }
       await startWatch();
-      setNote("Watch is on. Driver and cabin appear when the car publishes them.");
     });
 
   const onListen = () =>
     run("listen", async () => {
       if (listening) {
         setListening(false);
-        setNote("Cabin mic muted.");
         return;
       }
       if (!watching) await startWatch();
       setListening(true);
-      setNote("Listening to the cabin.");
     });
 
   const onRecord = () =>
     run("record", async () => {
-      const status = useRideStore.getState().activeRecording?.status;
-      if (status === "recording") {
+      if (useRideStore.getState().activeRecording?.status === "recording") {
         await stopRecording();
-        setNote("Recording stopped. The file appears in the list when the car finishes the upload.");
         return;
       }
       await startRecording();
-      const next = useRideStore.getState().activeRecording;
-      setNote(
-        next?.status === "recording"
-          ? "Recording the cabin camera and microphone."
-          : "The car accepted the recording. It shows in the list below.",
-      );
     });
 
   const onSnap = () =>
     run("snap", async () => {
       const frame = channel === "cms" ? useRideStore.getState().frameCms : useRideStore.getState().frameDms;
-      const preview = frame?.imageUrl ? bustMediaUrl(frame.imageUrl, Date.now()) : latest;
-      setFrozen(true);
-      setFrozenUri(latest);
+      const preview = frame?.imageUrl ? bustMediaUrl(frame.imageUrl, Date.now()) : null;
       let flying = false;
 
       if (!reduceMotion && preview && wrapRef.current && stageRef.current && boxRef.current) {
@@ -263,48 +239,27 @@ export function CabinMediaBar({ channel, onChannelChange }: Props) {
         }
       }
 
-      try {
-        const snap = await takeSnapshot(channel);
-        revealUri.current = snap.imageUrl;
-        void saveRemoteImageToGallery(snap.imageUrl, `vms-${snap.channel}-${snap.id}.jpg`).catch(() => undefined);
-        setNote(`Saved · ${channelLabel}`);
-        void notificationFeedback();
-        if (!flying) {
-          releaseBox();
-          setPinned(snap.imageUrl);
-          pulseBox();
-        }
-      } catch (error) {
-        setFlight(null);
-        revealUri.current = null;
-        releaseBox();
-        throw error;
-      }
+      const snap = await takeSnapshot(channel);
+      void saveRemoteImageToGallery(snap.imageUrl, `vms-${snap.channel}-${snap.id}.jpg`).catch(() => undefined);
+      void notificationFeedback();
+      if (!flying) pulseBox();
     });
 
   const onSpeak = () =>
     run("speak", async () => {
       if (speaking) {
         await stopTalk();
-        setSpeakBlocked(null);
-        setNote("Speak ended.");
         return;
       }
       try {
         await ensureMicrophonePermission();
         await startTalk();
-        setSpeakBlocked(null);
-        setNote("Tap the red bar once to speak into the cabin.");
       } catch (error) {
         if (error instanceof ApiError && error.status === 404) {
-          const msg = "Speak isn’t available on this server yet.";
-          setSpeakBlocked(msg);
-          throw new Error(msg);
+          throw new Error("Speak isn’t available on this server yet.");
         }
         if (error instanceof ApiError && error.status === 409) {
-          const msg = "Speak needs the live video service.";
-          setSpeakBlocked(msg);
-          throw new Error(msg);
+          throw new Error("Speak needs the live video service.");
         }
         if (error instanceof ApiError && error.status === 403) {
           throw new Error("Sharing is off, so Speak is blocked.");
@@ -313,11 +268,8 @@ export function CabinMediaBar({ channel, onChannelChange }: Props) {
       }
     });
 
-  const recordingNow = activeRecording?.status === "recording";
-  const frameHeight =
-    watchLayout === "both"
-      ? Math.max(520, Math.round(screenHeight * 0.72))
-      : Math.max(280, Math.round(screenHeight * 0.46));
+  const showDriver = layout !== "cms";
+  const showCabin = layout !== "dms";
 
   return (
     <View
@@ -332,143 +284,150 @@ export function CabinMediaBar({ channel, onChannelChange }: Props) {
           stageRef.current = node as HostRef | null;
         }}
         collapsable={false}
-        style={watching ? { marginHorizontal: -20, width: screenWidth } : undefined}
+        style={[styles.stage, { height: stageHeight }]}
       >
         {watching && videoSession ? (
           <CabinWatchPlayer
             session={videoSession}
             listen={listening}
-            layout={watchLayout}
+            layout={layout}
             selected={channel}
-            onSelect={onChannelChange}
+            onSelect={setChannel}
             driverFrame={frameDms}
             cabinFrame={frameCms}
-            height={frameHeight}
+            height={stageHeight}
             broad
           />
         ) : (
-          <View style={[styles.stage, styles.idle]}>
-            <AppText variant="strong">Cameras</AppText>
-            <AppText variant="caption" style={{ textAlign: "center" }}>
-              Tap Watch for the driver and cabin cameras. Snap saves the {channelLabel.toLowerCase()} still on the server.
-            </AppText>
+          <View style={styles.stills}>
+            {showDriver ? (
+              <LiveStill
+                frame={frameDms}
+                label="Driver"
+                embedded
+                hideTag={layout !== "both"}
+                tagClearance={layout === "both" ? 48 : 0}
+                reloadToken={reloadToken}
+              />
+            ) : null}
+            {showCabin ? (
+              <LiveStill frame={frameCms} label="Cabin" embedded hideTag={layout !== "both"} reloadToken={reloadToken} />
+            ) : null}
           </View>
         )}
-      </View>
 
-      <StreamReading layout={watching ? watchLayout : "both"} />
+        <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+          <View pointerEvents="box-none" style={styles.switchSlot}>
+            <View style={styles.switchTrack}>
+              {(
+                [
+                  { id: "both", label: "Both" },
+                  { id: "cms", label: "Cabin" },
+                  { id: "dms", label: "Driver" },
+                ] as const
+              ).map((item) => {
+                const selected = layout === item.id;
+                return (
+                  <Pressable
+                    key={item.id}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={item.label}
+                    onPress={() => {
+                      void selectionFeedback();
+                      onLayout(item.id);
+                    }}
+                    style={[styles.switchItem, selected && styles.switchOn]}
+                  >
+                    <AppText
+                      variant="caption"
+                      style={{ color: selected ? colors.limeInk : INK, fontSize: 13 }}
+                    >
+                      {item.label}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
 
-      {watching ? (
-        <Segmented
-          value={watchLayout}
-          onChange={(id) => {
-            const next = id as WatchLayout;
-            setWatchLayout(next);
-            if (next === "dms" || next === "cms") onChannelChange(next);
-          }}
-          items={[
-            { id: "both", label: "Both" },
-            { id: "dms", label: "Driver" },
-            { id: "cms", label: "Cabin" },
-          ]}
-        />
-      ) : null}
+          <View pointerEvents="box-none" style={[styles.rail, styles.railLeft]}>
+            <Orb
+              label={listening ? "Mute" : "Listen"}
+              busy={busy === "listen"}
+              active={listening}
+              onPress={onListen}
+              icon={<Ear size={20} color={listening ? colors.limeInk : INK} strokeWidth={1.75} />}
+              styles={styles}
+            />
+            <Orb
+              label={recordingNow ? "Stop recording" : "Record"}
+              busy={busy === "record"}
+              active={recordingNow}
+              danger
+              onPress={onRecord}
+              icon={<CircleDot size={20} color={recordingNow ? colors.onDanger : INK} strokeWidth={1.75} />}
+              styles={styles}
+            />
+          </View>
 
-      <View style={styles.row}>
-        <Control
-          label={watching ? "Stop" : "Watch"}
-          busy={busy === "watch"}
-          active={watching}
-          colors={colors}
-          styles={styles}
-          onPress={onWatch}
-          icon={<Video size={20} color={watching ? colors.signal : colors.ink} strokeWidth={1.75} />}
-        />
-        <Control
-          label={listening ? "Mute" : "Listen"}
-          busy={busy === "listen"}
-          active={listening}
-          colors={colors}
-          styles={styles}
-          onPress={onListen}
-          icon={<Ear size={20} color={listening ? colors.signal : colors.ink} strokeWidth={1.75} />}
-        />
-        <Control
-          label={recordingNow ? "Stop" : "Record"}
-          busy={busy === "record"}
-          active={recordingNow}
-          danger
-          colors={colors}
-          styles={styles}
-          onPress={onRecord}
-          icon={<CircleDot size={20} color={recordingNow ? colors.danger : colors.ink} strokeWidth={1.75} />}
-        />
-        <Control
-          label="Snap"
-          busy={busy === "snap"}
-          active={false}
-          colors={colors}
-          styles={styles}
-          onPress={onSnap}
-          icon={<Camera size={20} color={colors.ink} strokeWidth={1.75} />}
-        />
-        <Control
-          label={speaking ? "End" : "Speak"}
-          busy={busy === "speak"}
-          active={speaking}
-          danger
-          colors={colors}
-          styles={styles}
-          onPress={onSpeak}
-          icon={<Mic size={20} color={speaking ? colors.danger : colors.ink} strokeWidth={1.75} />}
-        />
-      </View>
+          <View pointerEvents="box-none" style={[styles.rail, styles.railRight]}>
+            <View
+              ref={(node) => {
+                boxRef.current = node as HostRef | null;
+              }}
+              collapsable={false}
+            >
+              <Animated.View style={boxStyle}>
+                <Orb
+                  label="Snap"
+                  busy={busy === "snap"}
+                  onPress={onSnap}
+                  icon={<Camera size={20} color={INK} strokeWidth={1.75} />}
+                  styles={styles}
+                />
+              </Animated.View>
+            </View>
+            <Orb
+              label={speaking ? "End speak" : "Speak"}
+              busy={busy === "speak"}
+              active={speaking}
+              danger
+              onPress={onSpeak}
+              icon={<Mic size={20} color={speaking ? colors.onDanger : INK} strokeWidth={1.75} />}
+              styles={styles}
+            />
+          </View>
 
-      <View style={styles.shelf}>
-        <View
-          ref={(node) => {
-            boxRef.current = node as HostRef | null;
-          }}
-          style={styles.box}
-          collapsable={false}
-        >
-          <Animated.View style={[StyleSheet.absoluteFill, boxStyle]}>
-            {boxUri ? (
-              <Image source={{ uri: boxUri }} style={styles.boxImage} contentFit="cover" />
-            ) : (
-              <View style={styles.box}>
-                <Camera size={18} color={colors.inkFaint} strokeWidth={1.75} />
-              </View>
-            )}
-          </Animated.View>
+          <View pointerEvents="box-none" style={styles.watchSlot}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={watching ? "Stop watch" : "Watch"}
+              onPress={onWatch}
+              disabled={busy === "watch"}
+              style={[styles.watch, watching && styles.watchOn, busy === "watch" && { opacity: 0.55 }]}
+            >
+              {busy === "watch" ? (
+                <ActivityIndicator color={INK} />
+              ) : (
+                <Video size={18} color={watching ? colors.onDanger : INK} strokeWidth={1.75} />
+              )}
+              <AppText variant="caption" style={{ color: watching ? colors.onDanger : INK }}>
+                {watching ? "Stop" : "Watch"}
+              </AppText>
+            </Pressable>
+          </View>
         </View>
-        <View style={styles.shelfText}>
-          <AppText variant="strong" style={{ fontSize: 15 }}>
-            {boxUri ? "Latest snap" : "Snaps"}
-          </AppText>
-          <AppText variant="caption" numberOfLines={3}>
-            {boxUri
-              ? `${snapshots[0]?.channel === "cms" ? "Cabin" : "Driver"} still from the server`
-              : watching
-                ? `Snap saves the server's latest ${channelLabel.toLowerCase()} still. Watch pauses new stills.`
-                : `Snap saves the ${channelLabel.toLowerCase()} camera on the server. Tap a picture to choose it.`}
-          </AppText>
-        </View>
       </View>
-
-      {speaking && talkSession ? <CabinTalkPublisher session={talkSession} /> : null}
-
-      {speakBlocked && !note ? (
-        <AppText variant="caption" style={[styles.hint, { color: colors.amber }]} numberOfLines={2}>
-          {speakBlocked}
-        </AppText>
-      ) : null}
 
       {note ? (
-        <AppText variant="caption" style={styles.hint} numberOfLines={2}>
+        <AppText variant="caption" style={{ color: colors.amber }} numberOfLines={2}>
           {note}
         </AppText>
       ) : null}
+
+      {speaking && talkSession ? <CabinTalkPublisher session={talkSession} /> : null}
+      <StreamReading layout={layout} />
 
       {flight ? (
         <SnapShotFly
@@ -477,11 +436,7 @@ export function CabinMediaBar({ channel, onChannelChange }: Props) {
           from={flight.from}
           to={flight.to}
           onDone={() => {
-            const next = revealUri.current;
-            revealUri.current = null;
             setFlight(null);
-            releaseBox();
-            if (next) setPinned(next);
             pulseBox();
           }}
         />
@@ -490,7 +445,7 @@ export function CabinMediaBar({ channel, onChannelChange }: Props) {
   );
 }
 
-function Control({
+function Orb({
   label,
   icon,
   onPress,
@@ -498,36 +453,33 @@ function Control({
   active,
   danger,
   styles,
-  colors,
 }: {
   label: string;
   icon: ReactNode;
   onPress: () => void;
   busy: boolean;
-  active: boolean;
+  active?: boolean;
   danger?: boolean;
   styles: {
-    control: object;
-    circle: object;
-    circleOn: object;
-    circleDanger: object;
+    orb: object;
+    orbOn: object;
+    orbDanger: object;
   };
-  colors: { ink: string };
 }) {
+  const { colors } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ selected: Boolean(active) }}
       onPress={onPress}
       disabled={busy}
-      style={({ pressed }) => [styles.control, pressed && !busy && { opacity: 0.72 }, busy && { opacity: 0.55 }]}
+      hitSlop={6}
+      style={({ pressed }) => [pressed && !busy && { opacity: 0.72 }, busy && { opacity: 0.55 }]}
     >
-      <View style={[styles.circle, active && !danger && styles.circleOn, active && danger && styles.circleDanger]}>
-        {busy ? <ActivityIndicator color={colors.ink} /> : icon}
+      <View style={[styles.orb, active && !danger && styles.orbOn, active && danger && styles.orbDanger]}>
+        {busy ? <ActivityIndicator color={active ? colors.limeInk : INK} /> : icon}
       </View>
-      <AppText variant="caption" numberOfLines={1} style={{ fontSize: 12 }}>
-        {label}
-      </AppText>
     </Pressable>
   );
 }

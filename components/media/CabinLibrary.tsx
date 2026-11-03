@@ -90,30 +90,20 @@ export function CabinLibrary({ recordings, snapshots }: Props) {
           borderTopColor: colors.line,
         },
         rowFirst: { borderTopWidth: 0 },
-        empty: {
-          borderRadius: 18,
-          backgroundColor: colors.bgRaised,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.line,
-          paddingHorizontal: 14,
-          paddingVertical: 16,
-        },
       }),
     [colors],
   );
 
+  if (snapshots.length === 0 && recordings.length === 0) return null;
+
   return (
     <View style={styles.wrap}>
+      {snapshots.length > 0 ? (
       <View style={styles.block}>
         <View style={styles.head}>
           <AppText variant="caption">Snaps</AppText>
-          {snapshots.length > 0 ? <AppText variant="caption">{snapshots.length}</AppText> : null}
+          <AppText variant="caption">{snapshots.length}</AppText>
         </View>
-        {snapshots.length === 0 ? (
-          <View style={styles.empty}>
-            <AppText variant="caption">Snaps you take show up here.</AppText>
-          </View>
-        ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.snaps}>
             {snapshots.slice(0, 12).map((snap) => {
               const fresh = snap.id === freshId;
@@ -138,8 +128,8 @@ export function CabinLibrary({ recordings, snapshots }: Props) {
               );
             })}
           </ScrollView>
-        )}
       </View>
+      ) : null}
 
       {recordings.length > 0 ? (
         <View style={styles.block}>

@@ -1,10 +1,9 @@
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 import { router } from "expo-router";
 
 import { Page } from "@/components/layout/Page";
 import { TripHistoryCard } from "@/components/trips/TripHistoryCard";
 import { ApiStatusBanner } from "@/components/system/ApiStatusBanner";
-import { AppText } from "@/components/ui/AppText";
 import { ScreenState } from "@/components/ui/ScreenState";
 import { rideDate } from "@/constants/format";
 import { pastTrips } from "@/data/fleet";
@@ -16,7 +15,6 @@ import { historyTripKey } from "@/types/domain";
 export function TripsScreen() {
   useLiveApiRefresh("all");
   const liveMode = useRideStore((state) => state.liveMode);
-  const rideId = useRideStore((state) => state.rideId);
   const history = useRideStore((state) => state.history);
   const refreshing = useRideStore((state) => state.refreshing);
   const refreshHistory = useRideStore((state) => state.refreshHistory);
@@ -25,7 +23,6 @@ export function TripsScreen() {
   return (
     <Page
       title="Trips"
-      subtitle={liveMode ? "Past rides for this device" : "Saved on this phone"}
       refreshing={refreshing}
       onRefresh={
         liveMode
@@ -39,12 +36,9 @@ export function TripsScreen() {
 
       {liveMode ? (
         history.length === 0 ? (
-          <ScreenState kind="empty" title="No past rides" body="Trips from GET /v1/history show here." />
+          <ScreenState kind="empty" title="No past rides" />
         ) : (
           <>
-            <AppText variant="caption" style={styles.hint}>
-              Same ride id can appear more than once — each row is a trip keyed by start time.
-            </AppText>
             {history.map((trip) => (
               <TripHistoryCard
                 key={historyTripKey(trip)}
@@ -80,18 +74,6 @@ export function TripsScreen() {
           />
         ))
       )}
-
-      {liveMode ? (
-        <AppText variant="caption" style={styles.footer}>
-          Active tracking is on Live. Full events are on Alerts.
-          {rideId ? ` · ${rideId}` : ""}
-        </AppText>
-      ) : null}
     </Page>
   );
 }
-
-const styles = StyleSheet.create({
-  hint: { marginBottom: 8 },
-  footer: { marginTop: 20 },
-});
