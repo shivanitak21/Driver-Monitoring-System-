@@ -38,8 +38,7 @@ export function TripsScreen() {
         history.length === 0 ? (
           <ScreenState kind="empty" title="No past rides" />
         ) : (
-          <>
-            {history.map((trip) => (
+          history.map((trip) => (
               <TripHistoryCard
                 key={historyTripKey(trip)}
                 title={trip.passenger || trip.id}
@@ -60,8 +59,7 @@ export function TripsScreen() {
                   router.push(`/trip/${trip.id}${qs}`);
                 }}
               />
-            ))}
-          </>
+            ))
         )
       ) : (
         pastTrips.map((trip) => (

@@ -29,6 +29,12 @@ type HostRef = {
 const INK = "#F5F6F7";
 const GLASS = "rgba(9,10,12,0.58)";
 
+const VIEWS = [
+  { id: "both", label: "Both" },
+  { id: "cms", label: "Cabin" },
+  { id: "dms", label: "Driver" },
+] as const;
+
 function measureWindow(node: HostRef): Promise<FlyRect> {
   return new Promise((resolve, reject) => {
     node.measureInWindow((x, y, width, height) => {
@@ -239,10 +245,15 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
         }
       }
 
-      const snap = await takeSnapshot(channel);
-      void saveRemoteImageToGallery(snap.imageUrl, `vms-${snap.channel}-${snap.id}.jpg`).catch(() => undefined);
-      void notificationFeedback();
-      if (!flying) pulseBox();
+      try {
+        const snap = await takeSnapshot(channel);
+        void saveRemoteImageToGallery(snap.imageUrl, `vms-${snap.channel}-${snap.id}.jpg`).catch(() => undefined);
+        void notificationFeedback();
+        if (!flying) pulseBox();
+      } catch (error) {
+        setFlight(null);
+        throw error;
+      }
     });
 
   const onSpeak = () =>
@@ -319,13 +330,7 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
         <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
           <View pointerEvents="box-none" style={styles.switchSlot}>
             <View style={styles.switchTrack}>
-              {(
-                [
-                  { id: "both", label: "Both" },
-                  { id: "cms", label: "Cabin" },
-                  { id: "dms", label: "Driver" },
-                ] as const
-              ).map((item) => {
+              {VIEWS.map((item) => {
                 const selected = layout === item.id;
                 return (
                   <Pressable

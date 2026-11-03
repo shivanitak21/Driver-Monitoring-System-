@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 
@@ -47,6 +47,19 @@ export function CabinScreen() {
   const [note, setNote] = useState("");
   const [frameTick, setFrameTick] = useState(0);
 
+  const refreshLive = useCallback(
+    () =>
+      Promise.all([
+        refreshCabin(),
+        refreshFrames(),
+        refreshAnalysis(),
+        refreshGuardians().catch(() => undefined),
+        refreshRecordings().catch(() => undefined),
+        refreshSnapshots().catch(() => undefined),
+      ]),
+    [refreshAnalysis, refreshCabin, refreshFrames, refreshGuardians, refreshRecordings, refreshSnapshots],
+  );
+
   useEffect(() => {
     if (!consent) {
       setPhase("idle");
@@ -58,14 +71,7 @@ export function CabinScreen() {
       void (async () => {
         try {
           if (liveMode) {
-            await Promise.all([
-              refreshCabin(),
-              refreshFrames(),
-              refreshAnalysis(),
-              refreshGuardians().catch(() => undefined),
-              refreshRecordings().catch(() => undefined),
-              refreshSnapshots().catch(() => undefined),
-            ]);
+            await refreshLive();
             if (alive) setFrameTick(Date.now());
           } else {
             await services.cabin.open({ camera: "cabin", fault });
@@ -87,12 +93,7 @@ export function CabinScreen() {
     consent,
     fault,
     liveMode,
-    refreshAnalysis,
-    refreshCabin,
-    refreshFrames,
-    refreshGuardians,
-    refreshRecordings,
-    refreshSnapshots,
+    refreshLive,
   ]);
 
   useEffect(() => {
@@ -126,14 +127,7 @@ export function CabinScreen() {
   );
 
   const onRefresh = () => {
-    void Promise.all([
-      refreshCabin(),
-      refreshFrames(),
-      refreshAnalysis(),
-      refreshGuardians().catch(() => undefined),
-      refreshRecordings().catch(() => undefined),
-      refreshSnapshots().catch(() => undefined),
-    ]);
+    void refreshLive();
   };
 
   return (

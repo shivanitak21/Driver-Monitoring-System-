@@ -99,11 +99,11 @@ export function CabinLibrary({ recordings, snapshots }: Props) {
   return (
     <View style={styles.wrap}>
       {snapshots.length > 0 ? (
-      <View style={styles.block}>
-        <View style={styles.head}>
-          <AppText variant="caption">Snaps</AppText>
-          <AppText variant="caption">{snapshots.length}</AppText>
-        </View>
+        <View style={styles.block}>
+          <View style={styles.head}>
+            <AppText variant="caption">Snaps</AppText>
+            <AppText variant="caption">{snapshots.length}</AppText>
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.snaps}>
             {snapshots.slice(0, 12).map((snap) => {
               const fresh = snap.id === freshId;
@@ -128,7 +128,7 @@ export function CabinLibrary({ recordings, snapshots }: Props) {
               );
             })}
           </ScrollView>
-      </View>
+        </View>
       ) : null}
 
       {recordings.length > 0 ? (
