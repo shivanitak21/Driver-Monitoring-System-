@@ -25,7 +25,7 @@ export function KeyedRideMap({
   onPressVehicle,
 }: Props) {
   const webRef = useRef<WebView>(null);
-  const [source, setSource] = useState<"google" | "tiles">("google");
+  const [source, setSource] = useState<"google" | "tiles">(apiKey ? "google" : "tiles");
   const [broken, setBroken] = useState(false);
   const { scheme, colors } = useTheme();
   const reduceMotion = useReduceMotion();

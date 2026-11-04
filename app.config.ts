@@ -30,6 +30,17 @@ const plugins: ExpoConfig["plugins"] = [
       granularPermissions: ["photo"],
     },
   ],
+  [
+    "expo-build-properties",
+    {
+      android: {
+        // R8 strips WorkManager's Room database (pulled in by react-native-maps),
+        // and the release APK dies before the first screen.
+        enableMinifyInReleaseBuilds: false,
+        enableShrinkResourcesInReleaseBuilds: false,
+      },
+    },
+  ],
 ];
 
 if (mapsKey) {
@@ -91,6 +102,9 @@ const config: ExpoConfig = {
     typedRoutes: false,
   },
   extra: {
+    eas: {
+      projectId: "159d8219-a7cd-482f-82fb-300c764c115d",
+    },
     // Demo guardian API. Override with EXPO_PUBLIC_TELEMETRY_URL when needed.
     telemetryUrl: (process.env.EXPO_PUBLIC_TELEMETRY_URL || "http://51.81.81.118:8000").trim(),
     mqttUrl: (process.env.EXPO_PUBLIC_MQTT_URL ?? "").trim(),

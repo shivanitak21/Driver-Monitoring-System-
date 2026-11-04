@@ -13,7 +13,9 @@ import { useTheme } from "@/providers/ThemeProvider";
 
 export function RideMap(props: RideMapProps) {
   const apiKey = googleMapsApiKey();
-  if (apiKey) return <KeyedRideMap {...props} apiKey={apiKey} />;
+  // A release APK has no Expo Go maps key. Creating the native Google map
+  // without com.google.android.geo.API_KEY aborts the process on launch.
+  if (apiKey || Platform.OS === "android") return <KeyedRideMap {...props} apiKey={apiKey} />;
   return <NativeRideMap {...props} />;
 }
 
