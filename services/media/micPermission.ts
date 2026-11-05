@@ -5,6 +5,7 @@ import { Platform } from "react-native";
 export async function ensureMicrophonePermission(): Promise<void> {
   const current = await Camera.getMicrophonePermissionsAsync();
   if (current.granted) return;
+  
 
   const next = await Camera.requestMicrophonePermissionsAsync();
   if (next.granted) return;
