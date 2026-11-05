@@ -47,6 +47,22 @@ export function ChevronLeft(props: IconProps) {
   );
 }
 
+export function ChevronDown(props: IconProps) {
+  return (
+    <Svg {...frame(props)}>
+      <Path d="m6 9 6 6 6-6" />
+    </Svg>
+  );
+}
+
+export function ChevronUp(props: IconProps) {
+  return (
+    <Svg {...frame(props)}>
+      <Path d="m18 15-6-6-6 6" />
+    </Svg>
+  );
+}
+
 export function LocateFixed(props: IconProps) {
   return (
     <Svg {...frame(props)}>

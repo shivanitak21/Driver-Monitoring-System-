@@ -1,9 +1,9 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Bell, Car, LocateFixed, Settings, X } from "@/components/ui/icons";
+import { Bell, Car, ChevronUp, LocateFixed, Settings, X } from "@/components/ui/icons";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, { FadeInDown, FadeInRight } from "react-native-reanimated";
+import Animated, { FadeIn, FadeInDown, FadeInRight, FadeOut } from "react-native-reanimated";
 
 import { useDockOffset } from "@/components/layout/DockTabBar";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
@@ -66,6 +66,7 @@ export function LiveMapScreen() {
   const refreshAll = useRideStore((state) => state.refreshAll);
   const bootstrapLive = useRideStore((state) => state.bootstrapLive);
   const [alertsOpen, setAlertsOpen] = useState(false);
+  const [rideOpen, setRideOpen] = useState(false);
   const safety = useSafetyIndex();
   const askSos = useRideStore((state) => state.askSos);
   const safetyStatus = useRideStore((state) => state.safetyStatus);
@@ -107,6 +108,21 @@ export function LiveMapScreen() {
   const urgent = openAlerts.some((alert) => alert.severity === "high" || alert.severity === "critical");
   const alertPreview = openAlerts.slice(0, 3);
   const openVehicle = () => router.push(`/vehicle/${deviceId || rideMeta.deviceId}`);
+  const openRideCard = () => {
+    setAlertsOpen(false);
+    setRideOpen(true);
+  };
+  const closeRideCard = () => setRideOpen(false);
+  const rideTitle = passengerName || rideId || "Ride";
+  const liveCaption = liveMode
+    ? connection !== "live"
+      ? "Syncing"
+      : deviceOnline
+        ? publisherOnline
+          ? "Live tracking"
+          : "Live · cam off"
+        : "Device offline"
+    : "Live";
 
   const styles = useMemo(
     () =>
@@ -157,6 +173,10 @@ export function LiveMapScreen() {
           ...StyleSheet.absoluteFill,
           zIndex: 4,
         },
+        rideBackdrop: {
+          ...StyleSheet.absoluteFill,
+          zIndex: 2,
+        },
         alertPanel: {
           marginTop: 8,
           width: 236,
@@ -169,7 +189,7 @@ export function LiveMapScreen() {
           gap: 8,
         },
         alertRow: { gap: 2, paddingVertical: 4 },
-        sheetHost: {
+        chrome: {
           position: "absolute",
           left: 14,
           right: 14,
@@ -180,15 +200,36 @@ export function LiveMapScreen() {
           gap: 8,
           alignItems: "flex-start",
         },
-        actions: {
+        collapsedRow: {
           flexDirection: "row",
-          alignItems: "flex-end",
-          justifyContent: "space-between",
-          paddingHorizontal: 10,
+          alignItems: "center",
+          gap: 10,
         },
-        action: { flex: 1, alignItems: "center", gap: 6 },
-        sheetTop: { flexDirection: "row", alignItems: "center", gap: 12 },
+        rideChip: {
+          flex: 1,
+        },
+        rideChipInner: {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 12,
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+        },
+        rideChipText: {
+          flex: 1,
+          gap: 2,
+        },
+        sheetTop: {
+          flexDirection: "row",
+          alignItems: "flex-start",
+          gap: 12,
+        },
         flex: { flex: 1, gap: 3 },
+        sheetActions: {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+        },
         metrics: {
           flexDirection: "row",
           gap: 10,
@@ -198,6 +239,12 @@ export function LiveMapScreen() {
           borderTopColor: colors.line,
         },
         metric: { flex: 1, gap: 2 },
+        vehicleLink: {
+          marginTop: 14,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+        },
         boot: {
           ...StyleSheet.absoluteFill,
           justifyContent: "center",
@@ -222,7 +269,7 @@ export function LiveMapScreen() {
               follow={follow}
               deviceFix={liveMode ? null : deviceFix}
               onPan={() => setFollow(false)}
-              onPressVehicle={openVehicle}
+              onPressVehicle={openRideCard}
             />
           ) : null}
         </MapErrorBoundary>
@@ -235,6 +282,14 @@ export function LiveMapScreen() {
           />
         ) : null}
 
+        {rideOpen ? (
+          <Pressable
+            accessibilityLabel="Dismiss ride details"
+            onPress={closeRideCard}
+            style={styles.rideBackdrop}
+          />
+        ) : null}
+
         <View style={[styles.top, { top: insets.top + 8, zIndex: 5 }]}>
           <Glass variant="float" radius={24} intensity={48}>
             <View style={styles.livePill}>
@@ -243,19 +298,10 @@ export function LiveMapScreen() {
               </View>
               <View style={{ paddingRight: 16, paddingVertical: 10, gap: 2 }}>
                 <AppText variant="strong" style={{ fontSize: 14 }}>
-                  {liveMode
-                    ? connection !== "live"
-                      ? "Syncing"
-                      : deviceOnline
-                        ? publisherOnline
-                          ? "Live tracking"
-                          : "Live · cam off"
-                        : "Device offline"
-                    : "Live"}
+                  {liveCaption}
                 </AppText>
                 <AppText variant="caption" numberOfLines={1}>
-                  {passengerName || rideId}
-                  {liveMode ? ` · ${rideStatus}` : ""}
+                  {liveMode ? rideStatus : headline.status}
                 </AppText>
               </View>
             </View>
@@ -265,7 +311,10 @@ export function LiveMapScreen() {
               <IconButton
                 label={alertsOpen ? "Close alerts" : "Alerts"}
                 testID="home-alerts"
-                onPress={() => setAlertsOpen((open) => !open)}
+                onPress={() => {
+                  setRideOpen(false);
+                  setAlertsOpen((open) => !open);
+                }}
               >
                 {alertsOpen ? (
                   <X size={18} color={colors.ink} strokeWidth={1.75} />
@@ -344,60 +393,101 @@ export function LiveMapScreen() {
             ) : null}
           </View>
         </View>
-
       </View>
 
-      <Animated.View
-        entering={reduceMotion ? undefined : FadeInDown.duration(480)}
-        style={[styles.sheetHost, { bottom: dock - 6 }]}
-        pointerEvents="box-none"
-      >
+      <View style={[styles.chrome, { bottom: dock - 6 }]} pointerEvents="box-none">
         <View style={styles.banners} pointerEvents="box-none">
           <OfflineBanner />
           <ApiStatusBanner onRetry={retry} />
         </View>
 
-        <View style={styles.actions}>
-          <MapAction
-            testID="home-vehicle"
-            label="Vehicle"
-            onPress={openVehicle}
-            icon={<Car size={18} color={colors.ink} strokeWidth={1.75} />}
-          />
-          <View style={styles.action}>
-            <SosButton onPress={askSos} />
-          </View>
-        </View>
-
-        <Glass variant="sheet" radius={30} intensity={52}>
-          <View style={{ paddingHorizontal: 18, paddingVertical: 16 }}>
-            <View style={styles.sheetTop}>
-              <View style={styles.flex}>
-                <AppText variant="title" numberOfLines={1} style={{ fontSize: 22, lineHeight: 28 }}>
-                  {passengerName}
-                </AppText>
-                <AppText variant="caption" numberOfLines={1}>
-                  {liveMode
-                    ? `${headline.status} · ${driverStateLabel(driverState)}`
-                    : `${headline.status} · ${headline.to}`}
-                </AppText>
+        {rideOpen ? (
+          <Animated.View
+            entering={reduceMotion ? undefined : FadeInDown.duration(280)}
+            exiting={reduceMotion ? undefined : FadeOut.duration(160)}
+            style={{ gap: 10 }}
+          >
+            <View style={{ alignItems: "flex-end", paddingHorizontal: 4 }}>
+              <SosButton onPress={askSos} />
+            </View>
+            <Glass variant="sheet" radius={30} intensity={52}>
+              <View style={{ paddingHorizontal: 18, paddingVertical: 16 }}>
+                <View style={styles.sheetTop}>
+                  <View style={styles.flex}>
+                    <AppText variant="title" numberOfLines={1} style={{ fontSize: 22, lineHeight: 28 }}>
+                      {rideTitle}
+                    </AppText>
+                    <AppText variant="caption" numberOfLines={1}>
+                      {liveMode
+                        ? `${headline.status} · ${driverStateLabel(driverState)}`
+                        : `${headline.status} · ${headline.to}`}
+                    </AppText>
+                  </View>
+                  <View style={styles.sheetActions}>
+                    <ScoreRing index={safety.index} status={safety.status} size={48} caption="Safety" />
+                    <IconButton label="Close ride details" testID="home-ride-close" onPress={closeRideCard}>
+                      <X size={18} color={colors.ink} strokeWidth={1.75} />
+                    </IconButton>
+                  </View>
+                </View>
+                <View style={styles.metrics}>
+                  <Metric label="ETA" value={formatEta(eta)} />
+                  <Metric label="Speed" value={formatSpeed(speed)} />
+                  <Metric label="Score" value={String(score)} />
+                </View>
+                {liveMode ? (
+                  <AppText variant="caption" numberOfLines={1} style={{ marginTop: 10 }}>
+                    {deviceOnline ? "Online" : "Offline"}
+                    {publisherOnline ? " · cam on" : " · cam off"}
+                  </AppText>
+                ) : null}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Open vehicle details"
+                  testID="home-vehicle"
+                  onPress={openVehicle}
+                  style={styles.vehicleLink}
+                  hitSlop={6}
+                >
+                  <Car size={16} color={colors.ink} strokeWidth={1.75} />
+                  <AppText variant="strong" style={{ fontSize: 14 }}>
+                    Vehicle details
+                  </AppText>
+                </Pressable>
               </View>
-              <ScoreRing index={safety.index} status={safety.status} size={54} caption="Safety" />
-            </View>
-            <View style={styles.metrics}>
-              <Metric label="ETA" value={formatEta(eta)} />
-              <Metric label="Speed" value={formatSpeed(speed)} />
-              <Metric label="Score" value={String(score)} />
-            </View>
-            {liveMode ? (
-              <AppText variant="caption" numberOfLines={1} style={{ marginTop: 10 }}>
-                {deviceOnline ? "Online" : "Offline"}
-                {publisherOnline ? " · cam on" : " · cam off"}
-              </AppText>
-            ) : null}
-          </View>
-        </Glass>
-      </Animated.View>
+            </Glass>
+          </Animated.View>
+        ) : (
+          <Animated.View
+            entering={reduceMotion ? undefined : FadeIn.duration(220)}
+            style={styles.collapsedRow}
+            pointerEvents="box-none"
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Open ride details for ${rideTitle}`}
+              testID="home-ride-chip"
+              onPress={openRideCard}
+              style={styles.rideChip}
+            >
+              <Glass variant="float" radius={26} intensity={48}>
+                <View style={styles.rideChipInner}>
+                  <View style={styles.rideChipText}>
+                    <AppText variant="strong" numberOfLines={1} style={{ fontSize: 15 }}>
+                      {rideTitle}
+                    </AppText>
+                    <AppText variant="caption" numberOfLines={1}>
+                      Tap for ETA · speed · safety
+                    </AppText>
+                  </View>
+                  <ChevronUp size={18} color={colors.inkMuted} strokeWidth={1.75} />
+                </View>
+              </Glass>
+            </Pressable>
+            <SosButton onPress={askSos} />
+          </Animated.View>
+        )}
+      </View>
 
       {booting ? (
         <ScreenGradient style={styles.boot}>
@@ -424,27 +514,6 @@ export function LiveMapScreen() {
           </View>
         </ScreenGradient>
       ) : null}
-    </View>
-  );
-}
-
-function MapAction({
-  label,
-  onPress,
-  icon,
-  testID,
-}: {
-  label: string;
-  onPress: () => void;
-  icon: ReactNode;
-  testID: string;
-}) {
-  return (
-    <View style={{ flex: 1, alignItems: "center", gap: 6 }}>
-      <IconButton testID={testID} label={label} onPress={onPress}>
-        {icon}
-      </IconButton>
-      <AppText variant="caption">{label}</AppText>
     </View>
   );
 }
