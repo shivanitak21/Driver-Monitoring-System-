@@ -9,12 +9,14 @@ import type {
   GuardianSnapshotDto,
   HistoryRideDto,
   LiveFrameDto,
+  LocalVideoSampleDto,
   NoticeDto,
   RideDto,
   TalkCancelDto,
   TalkSessionDto,
   VideoSessionDto,
 } from "@/services/api/types";
+import { jpegDataUriFromBase64 } from "@/services/media/decode";
 import type {
   AlertClip,
   AnalysisSide,
@@ -27,6 +29,7 @@ import type {
   GuardianSnapshot,
   HistoryRide,
   LiveFrame,
+  LocalVideoSample,
   MediaChannel,
   RideAnalysis,
   SafetyAlert,
@@ -294,13 +297,33 @@ export function normalizeLiveFrame(raw: Partial<LiveFrameDto> | null | undefined
   const channel = raw.channel === "cms" ? "cms" : raw.channel === "dms" ? "dms" : null;
   if (!channel) return null;
   const path = asString(raw.url);
-  if (!path) return null;
+  const fromB64 = jpegDataUriFromBase64(asString(raw.image_b64));
+  const imageUrl = path ? absoluteMediaUrl(path) : fromB64;
+  if (!imageUrl) return null;
   const at = asNumber(raw.at, Date.now()) ?? Date.now();
   return {
     rideId: asString(raw.rideId),
     channel,
     at,
-    imageUrl: absoluteMediaUrl(path),
+    imageUrl,
+  };
+}
+
+/** Local Watch sample — `image_b64` is a JPEG still, not an MP4. */
+export function normalizeLocalVideoSample(
+  raw: Partial<LocalVideoSampleDto> | null | undefined,
+): LocalVideoSample | null {
+  if (!raw || typeof raw !== "object") return null;
+  const imageUri = jpegDataUriFromBase64(asString(raw.image_b64));
+  if (!imageUri) return null;
+  return {
+    width: asNumber(raw.width, 0) ?? 0,
+    height: asNumber(raw.height, 0) ?? 0,
+    samples: asNumber(raw.samples, 0) ?? 0,
+    rate: asNumber(raw.rate, 0) ?? 0,
+    seq: asNumber(raw.seq, 0) ?? 0,
+    imageUri,
+    audioB64: raw.audio_b64 ? asString(raw.audio_b64) : null,
   };
 }
 
@@ -368,6 +391,7 @@ export function normalizeGuardianRecording(
   if (!raw || typeof raw !== "object") return null;
   const id = asString(raw.id);
   if (!id) return null;
+  // video_b64 is resolved to a file URL in the API layer (async write).
   return {
     id,
     rideId: asString(raw.rideId),
@@ -392,15 +416,18 @@ export function normalizeGuardianSnapshot(
 ): GuardianSnapshot | null {
   if (!raw || typeof raw !== "object") return null;
   const id = asString(raw.id);
+  if (!id) return null;
   const path = asString(raw.url);
-  if (!id || !path) return null;
+  const fromB64 = jpegDataUriFromBase64(asString(raw.image_b64));
+  const imageUrl = path ? absoluteMediaUrl(path) : fromB64;
+  if (!imageUrl) return null;
   return {
     id,
     rideId: asString(raw.rideId),
     guardianId: asString(raw.guardianId),
     channel: raw.channel === "cms" ? "cms" : "dms",
     at: asNumber(raw.at, 0) ?? 0,
-    imageUrl: absoluteMediaUrl(path),
+    imageUrl,
   };
 }
 
@@ -428,11 +455,14 @@ export function normalizeAlertClip(raw: Partial<AlertClipDto> | null | undefined
           .map((frame) => {
             const at = asNumber(frame?.at, 0) ?? 0;
             const path = asString(frame?.url);
-            if (!path) return null;
-            return { at, imageUrl: absoluteMediaUrl(path) };
+            const fromB64 = jpegDataUriFromBase64(asString(frame?.image_b64));
+            const imageUrl = path ? absoluteMediaUrl(path) : fromB64;
+            if (!imageUrl) return null;
+            return { at, imageUrl };
           })
           .filter((frame): frame is { at: number; imageUrl: string } => Boolean(frame))
       : [],
+    // video_b64 is resolved to a file URL in the API layer (async write).
     videoUrl: raw.videoUrl ? absoluteMediaUrl(asString(raw.videoUrl)) : null,
   };
 }

@@ -135,8 +135,20 @@ export type LiveFrame = {
   rideId: string;
   channel: MediaChannel;
   at: number;
-  /** Absolute URL for Image source */
+  /** Absolute URL or `data:image/jpeg;base64,…` for Image source */
   imageUrl: string;
+};
+
+/** Local Watch sample (`mode: local`) — JPEG still in `image_b64`, not an MP4. */
+export type LocalVideoSample = {
+  width: number;
+  height: number;
+  samples: number;
+  rate: number;
+  seq: number;
+  /** Decoded JPEG data URI for Image — never feed to a video player. */
+  imageUri: string;
+  audioB64: string | null;
 };
 
 export type VideoMode = "livekit" | "local" | "dummy";

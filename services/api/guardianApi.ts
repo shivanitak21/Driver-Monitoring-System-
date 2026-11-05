@@ -12,6 +12,7 @@ import {
   normalizeGuardians,
   normalizeHistoryRides,
   normalizeLiveFrame,
+  normalizeLocalVideoSample,
   normalizeNotices,
   normalizeRide,
   normalizeTalkCancel,
@@ -20,10 +21,13 @@ import {
   normalizeVideoSession,
 } from "@/services/api/normalize";
 import type {
+  AlertClipDto,
   AlertStatusFilter,
   CabinDto,
   CreateGuardianRequest,
+  GuardianRecordingDto,
   HealthDto,
+  LocalVideoSampleDto,
   RideDto,
   ShareResponse,
   SosRequest,
@@ -33,6 +37,7 @@ import type {
   TalkSessionDto,
   VideoCancelDto,
 } from "@/services/api/types";
+import { writeMp4FromBase64 } from "@/services/media/decode";
 import type {
   AlertClip,
   Guardian,
@@ -41,6 +46,7 @@ import type {
   GuardianSnapshot,
   HistoryRide,
   LiveFrame,
+  LocalVideoSample,
   MediaChannel,
   RideAnalysis,
   SafetyAlert,
@@ -49,6 +55,22 @@ import type {
   VideoCancelResult,
   VideoSession,
 } from "@/types/domain";
+
+function asStringId(item: { id?: unknown }): string {
+  return typeof item.id === "string" ? item.id : "";
+}
+
+/** If the API embedded `video_b64`, write an `.mp4` and use that path as videoUrl. */
+async function resolveEmbeddedMp4(
+  videoUrl: string | null,
+  videoB64: string | null | undefined,
+  filename: string,
+): Promise<string | null> {
+  if (videoUrl) return videoUrl;
+  const raw = typeof videoB64 === "string" ? videoB64.trim() : "";
+  if (!raw) return null;
+  return writeMp4FromBase64(raw, filename);
+}
 
 export type GuardianApi = {
   health(): Promise<HealthDto>;
@@ -68,6 +90,11 @@ export type GuardianApi = {
   getLiveFrame(rideId: string, channel: MediaChannel): Promise<LiveFrame>;
   /** Starts Watch publish on the car. Do not call on every screen refresh. */
   getVideo(rideId: string, track?: "all" | "driver" | "cabin"): Promise<VideoSession>;
+  /**
+   * Local Watch sample when `mode` is `local`.
+   * `image_b64` is a JPEG still — decode into an Image, never a video player.
+   */
+  getVideoLive(rideId: string): Promise<LocalVideoSample>;
   /** Stops Watch publish. Live stills keep updating. */
   cancelVideo(rideId: string): Promise<VideoCancelResult>;
   /** Speak: phone mic → cabin. Separate from Watch. */
@@ -216,6 +243,15 @@ export function createGuardianApi(): GuardianApi {
       return session;
     },
 
+    async getVideoLive(rideId) {
+      const raw = await apiRequest<LocalVideoSampleDto>(
+        `/v1/rides/${encodeURIComponent(rideId)}/video/live`,
+      );
+      const sample = normalizeLocalVideoSample(raw);
+      if (!sample) throw new Error("Invalid local video sample (expected image_b64 JPEG).");
+      return sample;
+    },
+
     async cancelVideo(rideId) {
       const raw = await apiRequest<VideoCancelDto>(
         `/v1/rides/${encodeURIComponent(rideId)}/video/cancel`,
@@ -247,26 +283,28 @@ export function createGuardianApi(): GuardianApi {
     },
 
     async startRecording(rideId, guardianId) {
-      const raw = await apiRequest(
+      const raw = await apiRequest<GuardianRecordingDto>(
         `/v1/rides/${encodeURIComponent(rideId)}/recordings`,
         {
           method: "POST",
           body: { action: "start", guardianId },
         },
       );
-      const recording = normalizeGuardianRecording(raw as never);
+      const recording = normalizeGuardianRecording(raw);
       if (!recording) throw new Error("Invalid recording payload from the API.");
-      return recording;
+      const videoUrl = await resolveEmbeddedMp4(recording.videoUrl, raw.video_b64, `${recording.id}.mp4`);
+      return { ...recording, videoUrl };
     },
 
     async cancelRecording(rideId, recordingId) {
-      const raw = await apiRequest(
+      const raw = await apiRequest<GuardianRecordingDto>(
         `/v1/rides/${encodeURIComponent(rideId)}/recordings/${encodeURIComponent(recordingId)}/cancel`,
         { method: "POST" },
       );
-      const recording = normalizeGuardianRecording(raw as never);
+      const recording = normalizeGuardianRecording(raw);
       if (!recording) throw new Error("Invalid recording cancel payload from the API.");
-      return recording;
+      const videoUrl = await resolveEmbeddedMp4(recording.videoUrl, raw.video_b64, `${recording.id}.mp4`);
+      return { ...recording, videoUrl };
     },
 
     async listRecordings(rideId, guardianId) {
@@ -274,8 +312,24 @@ export function createGuardianApi(): GuardianApi {
         `/v1/rides/${encodeURIComponent(rideId)}/recordings`,
         { query: guardianId ? { guardianId } : undefined },
       );
-      return normalizeGuardianRecordings(
-        Array.isArray(raw) ? raw : (raw as { recordings?: unknown })?.recordings ?? raw,
+      const list = Array.isArray(raw) ? raw : (raw as { recordings?: unknown })?.recordings ?? raw;
+      const normalized = normalizeGuardianRecordings(list);
+      if (!Array.isArray(list)) return normalized;
+      const byId = new Map(
+        list
+          .filter((item): item is GuardianRecordingDto => Boolean(item && typeof item === "object"))
+          .map((item) => [asStringId(item), item]),
+      );
+      return Promise.all(
+        normalized.map(async (recording) => {
+          const dto = byId.get(recording.id);
+          const videoUrl = await resolveEmbeddedMp4(
+            recording.videoUrl,
+            dto?.video_b64,
+            `${recording.id}.mp4`,
+          );
+          return { ...recording, videoUrl };
+        }),
       );
     },
 
@@ -300,12 +354,13 @@ export function createGuardianApi(): GuardianApi {
     },
 
     async getClip(rideId, clipId) {
-      const raw = await apiRequest(
+      const raw = await apiRequest<AlertClipDto>(
         `/v1/rides/${encodeURIComponent(rideId)}/clips/${encodeURIComponent(clipId)}`,
       );
-      const clip = normalizeAlertClip(raw as never);
+      const clip = normalizeAlertClip(raw);
       if (!clip) throw new Error("Invalid clip payload from the API.");
-      return clip;
+      const videoUrl = await resolveEmbeddedMp4(clip.videoUrl, raw.video_b64, `${clip.id}.mp4`);
+      return { ...clip, videoUrl };
     },
 
     async listGuardians(rideId) {

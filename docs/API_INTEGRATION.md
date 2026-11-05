@@ -1,6 +1,7 @@
 # API integration checklist
 
 Source of truth: [`FRONTEND.md`](./FRONTEND.md).  
+Media decode (JPEG / LiveKit / MP4): [`GUARDIAN_ANDROID_DECODE.md`](./GUARDIAN_ANDROID_DECODE.md).  
 Base: `EXPO_PUBLIC_TELEMETRY_URL` (default `http://51.81.81.118:8000`). No auth header. The phone does not call MQTT or Jetson upload routes.
 
 | Endpoint | Status | UI | Notes |
@@ -13,7 +14,8 @@ Base: `EXPO_PUBLIC_TELEMETRY_URL` (default `http://51.81.81.118:8000`). No auth 
 | `POST /v1/alerts/{alertId}/ack` | Integrated | Alerts | No body. |
 | `GET /v1/rides/{rideId}/analysis` | Integrated | Cabin | DMS and CMS. Socket `analysis` updates one channel. This API does not take a frame or a JSON body. The car publishes the reading. |
 | `GET /v1/rides/{rideId}/frames/live` | Integrated | Cabin stills | `dms` and `cms`. Image is `{BASE}` + `url`. Marked stale after 15s. |
-| `GET /v1/rides/{rideId}/video?track=all` | Integrated | Cabin Watch | Starts both `driver` and `cabin` video plus `cabin` audio. Called only when Watch starts, and again 60s before `expiresAt`. |
+| `GET /v1/rides/{rideId}/video?track=all` | Integrated | Cabin Watch | Starts both `driver` and `cabin` video plus `cabin` audio. Called only when Watch starts, and again 60s before `expiresAt`. `livekit` → LiveKit tracks; `dummy` → JPEG preview; `local` → poll `video/live` JPEG. |
+| `GET /v1/rides/{rideId}/video/live` | Integrated | Cabin Watch (`mode: local`) | Polls `image_b64` JPEG stills (~2s). Never fed to a video player. |
 | `POST /v1/rides/{rideId}/video/cancel` | Integrated | Stop Watch | Does not stop Speak. |
 | `POST /v1/rides/{rideId}/video/talk` | Integrated | Speak | Publishes `guardian-mic`. Does not subscribe. |
 | `POST /v1/rides/{rideId}/video/talk/cancel` | Integrated | End Speak | |

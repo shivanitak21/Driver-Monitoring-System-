@@ -14,8 +14,9 @@ type Props = {
   snapshots: GuardianSnapshot[];
 };
 
+/** Play a local H.264/AAC `.mp4` (from video_b64 or a downloaded clip). Not a JPEG. */
 function filePlayerSource(uri: string) {
-  const name = uri.split("/").pop() || "clip.webm";
+  const name = uri.split("/").pop() || "clip.mp4";
   const base = uri.slice(0, uri.length - name.length);
   const html = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#000"><video src="${name}" controls autoplay playsinline style="width:100%;height:100vh;object-fit:contain;background:#000"></video></body></html>`;
   return { html, baseUrl: base };

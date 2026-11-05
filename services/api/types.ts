@@ -106,7 +106,20 @@ export type LiveFrameDto = {
   rideId: string;
   channel: MediaChannel;
   at: number;
-  url: string;
+  url?: string;
+  /** Base64 JPEG from the cabin encoder — decode as a still, not video. */
+  image_b64?: string;
+};
+
+/** `GET /v1/rides/{rideId}/video/live` when Watch `mode` is `local`. */
+export type LocalVideoSampleDto = {
+  width?: number;
+  height?: number;
+  samples?: number;
+  rate?: number;
+  seq?: number;
+  image_b64?: string;
+  audio_b64?: string | null;
 };
 
 export type VideoSessionDto = {
@@ -148,7 +161,9 @@ export type GuardianRecordingDto = {
   status: "recording" | "stopping" | "ready" | "failed" | string;
   startedAt: number;
   endedAt: number | null;
-  videoUrl: string | null;
+  videoUrl?: string | null;
+  /** Base64 of one complete MP4 when the API embeds the file. */
+  video_b64?: string | null;
   audio: boolean;
 };
 
@@ -158,7 +173,8 @@ export type GuardianSnapshotDto = {
   guardianId: string;
   channel: MediaChannel;
   at: number;
-  url: string;
+  url?: string;
+  image_b64?: string;
 };
 
 export type AlertClipDto = {
@@ -168,8 +184,10 @@ export type AlertClipDto = {
   channel: MediaChannel;
   startAt: number;
   endAt: number;
-  frames: { at: number; url: string }[];
-  videoUrl: string | null;
+  frames: { at: number; url?: string; image_b64?: string }[];
+  videoUrl?: string | null;
+  /** Base64 of one complete MP4 — write to `.mp4`, then play. Not a URL. */
+  video_b64?: string | null;
 };
 
 export type SosRequest = {

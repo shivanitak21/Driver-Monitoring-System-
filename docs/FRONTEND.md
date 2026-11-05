@@ -27,6 +27,8 @@ Do not put these in the app: `MEDIA_DEVICE_KEY`, `LIVEKIT_API_SECRET`, MQTT pass
 
 Share this file. The new calls are Speak (`POST /video/talk`), guardian recordings and snaps (lists filtered by `guardianId`), alerts for one trip (`GET /alerts?startedAt=`), and push after `POST /push-token`. Alert clip id is still `alerts[].clipId`. Live video is `GET /video`, then two LiveKit tracks: `driver` and `cabin`.
 
+How the phone decodes media (JPEG stills, LiveKit tracks, MP4 clips): [`GUARDIAN_ANDROID_DECODE.md`](./GUARDIAN_ANDROID_DECODE.md).
+
 ---
 
 ## What the app calls
@@ -369,9 +371,9 @@ Use `url` exactly as returned. It may be `ws://`, not `wss://`.
 
 | `mode` | What to do |
 |---|---|
-| `livekit` | Connect to `url` with `token`. Subscribe to video `driver`, video `cabin`, and audio `cabin`. |
-| `local` | No LiveKit server. `GET /v1/rides/{rideId}/video/live` returns the latest sample as JSON (`width`, `height`, `samples`, `rate`, `image_b64`, `audio_b64`, `seq`). This is for a local test, not the production player. |
-| `dummy` | No moving stream. `publish` is `false`. Show the JPEG from `{BASE}{preview}?track=driver` or `track=cabin`. |
+| `livekit` | Connect to `url` with `token`. Subscribe to video `driver`, video `cabin`, and audio `cabin`. LiveKit decodes — do not JPEG-decode these frames. |
+| `local` | No LiveKit server. Poll `GET /v1/rides/{rideId}/video/live` (~2s). JSON has `image_b64` (JPEG). Base64-decode into an Image — never a video player. See [`GUARDIAN_ANDROID_DECODE.md`](./GUARDIAN_ANDROID_DECODE.md). |
+| `dummy` | No moving stream. `publish` is `false`. Show the JPEG from `{BASE}{preview}?track=driver` or `track=cabin` in an Image. |
 
 `403` when sharing is off.
 

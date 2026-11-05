@@ -77,12 +77,25 @@ export function EvidenceScreen() {
     };
   }, [alert, clipId, liveMode, rideId]);
 
-  const videoHtml = useMemo(() => {
-    if (!clip?.videoUrl) return "";
-    const src = clip.videoUrl.replace(/"/g, "&quot;");
-    return `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  const videoSource = useMemo(() => {
+    if (!clip?.videoUrl) return null;
+    const url = clip.videoUrl;
+    // Local MP4 from video_b64 — play file bytes, never the base64 string as a URL.
+    if (url.startsWith("file:") || url.startsWith("content:")) {
+      const name = url.split("/").pop() || "clip.mp4";
+      const base = url.slice(0, url.length - name.length);
+      return {
+        html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#000"><video src="${name}" controls autoplay playsinline style="width:100%;height:100%;object-fit:contain;background:#000"></video></body></html>`,
+        baseUrl: base,
+      };
+    }
+    const src = url.replace(/"/g, "&quot;");
+    return {
+      html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 <style>html,body{margin:0;padding:0;background:#000;height:100%;}video{width:100%;height:100%;object-fit:contain;background:#000;}</style></head>
-<body><video controls autoplay playsinline preload="metadata" src="${src}"></video></body></html>`;
+<body><video controls autoplay playsinline preload="metadata" src="${src}"></video></body></html>`,
+      baseUrl: undefined as string | undefined,
+    };
   }, [clip?.videoUrl]);
 
   if (!alert) {
@@ -150,31 +163,39 @@ export function EvidenceScreen() {
             </AppText>
           ) : null}
 
-          {clip.videoUrl ? (
+          {clip.videoUrl && videoSource ? (
             <>
               <Glass variant="card" radius={22}>
                 <View style={styles.player}>
                   <WebView
                     originWhitelist={["*"]}
-                    source={{ html: videoHtml }}
+                    source={
+                      videoSource.baseUrl
+                        ? { html: videoSource.html, baseUrl: videoSource.baseUrl }
+                        : { html: videoSource.html }
+                    }
                     style={styles.webview}
                     allowsInlineMediaPlayback
                     mediaPlaybackRequiresUserAction={false}
                     allowsFullscreenVideo
+                    allowFileAccess
+                    allowUniversalAccessFromFileURLs
                   />
                 </View>
               </Glass>
-              <Pressable
-                onPress={() => {
-                  void selectionFeedback();
-                  void Linking.openURL(clip.videoUrl!);
-                }}
-                hitSlop={8}
-              >
-                <AppText variant="caption" style={{ color: colors.ink }}>
-                  Open MP4 in browser
-                </AppText>
-              </Pressable>
+              {!clip.videoUrl.startsWith("file:") && !clip.videoUrl.startsWith("content:") ? (
+                <Pressable
+                  onPress={() => {
+                    void selectionFeedback();
+                    void Linking.openURL(clip.videoUrl!);
+                  }}
+                  hitSlop={8}
+                >
+                  <AppText variant="caption" style={{ color: colors.ink }}>
+                    Open MP4 in browser
+                  </AppText>
+                </Pressable>
+              ) : null}
             </>
           ) : (
             <AppText variant="caption">
