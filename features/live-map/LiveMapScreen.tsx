@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { Bell, Car, LocateFixed, Settings, X } from "@/components/ui/icons";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { FadeInDown, FadeInRight } from "react-native-reanimated";
 
 import { useDockOffset } from "@/components/layout/DockTabBar";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
@@ -15,6 +15,7 @@ import { IconButton } from "@/components/ui/Button";
 import { Glass } from "@/components/ui/Glass";
 import { AppText } from "@/components/ui/AppText";
 import { ScoreRing } from "@/components/ui/ScoreRing";
+import { ScreenGradient } from "@/components/ui/ScreenGradient";
 import { ScreenState } from "@/components/ui/ScreenState";
 import { useReduceMotion } from "@/hooks/useReduceMotion";
 import { timeAgo } from "@/constants/format";
@@ -80,7 +81,14 @@ export function LiveMapScreen() {
       }
     : tripHeadline(leg, Boolean(routeShift));
   const simulatedRoute = useMemo(() => shiftLine(routeLine, routeShift), [routeShift]);
-  const mapPosition = !liveMode || positionFromApi ? position : null;
+  // Show last known coordinates while waiting for the first live GPS fix.
+  // Without this, Live stays blank when the device is offline / positionFromApi is false.
+  const mapPosition =
+    position &&
+    Number.isFinite(position.latitude) &&
+    Number.isFinite(position.longitude)
+      ? position
+      : null;
   const liveGeo = useMemo(
     () =>
       mapPosition
@@ -123,7 +131,7 @@ export function LiveMapScreen() {
           width: 8,
           height: 8,
           borderRadius: 4,
-          backgroundColor: liveMode && !deviceOnline ? colors.amber : colors.signal,
+          backgroundColor: liveMode && !deviceOnline ? colors.inkFaint : colors.ink,
         },
         tools: {
           alignItems: "flex-end",
@@ -139,19 +147,19 @@ export function LiveMapScreen() {
           paddingHorizontal: 4,
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: urgent ? colors.danger : colors.lime,
+          backgroundColor: urgent ? colors.danger : colors.primary,
         },
         badgeText: {
-          color: urgent ? colors.onDanger : colors.limeInk,
+          color: urgent ? colors.onDanger : colors.onPrimary,
           fontSize: 10,
         },
         alertBackdrop: {
-          ...StyleSheet.absoluteFillObject,
+          ...StyleSheet.absoluteFill,
           zIndex: 4,
         },
         alertPanel: {
           marginTop: 8,
-          width: 220,
+          width: 236,
           gap: 10,
         },
         alertHeader: {
@@ -160,38 +168,43 @@ export function LiveMapScreen() {
           justifyContent: "space-between",
           gap: 8,
         },
-        alertRow: { gap: 2 },
-        bannerSlot: {
-          position: "absolute",
-          left: 16,
-          right: 16,
-          bottom: dock + 168,
-        },
+        alertRow: { gap: 2, paddingVertical: 4 },
         sheetHost: {
           position: "absolute",
-          left: 16,
-          right: 16,
-          gap: 12,
+          left: 14,
+          right: 14,
+          gap: 10,
+          zIndex: 3,
+        },
+        banners: {
+          gap: 8,
+          alignItems: "flex-start",
         },
         actions: {
           flexDirection: "row",
           alignItems: "flex-end",
           justifyContent: "space-between",
-          paddingHorizontal: 8,
+          paddingHorizontal: 10,
         },
         action: { flex: 1, alignItems: "center", gap: 6 },
         sheetTop: { flexDirection: "row", alignItems: "center", gap: 12 },
-        flex: { flex: 1, gap: 2 },
-        metrics: { flexDirection: "row", gap: 16, marginTop: 12 },
+        flex: { flex: 1, gap: 3 },
+        metrics: {
+          flexDirection: "row",
+          gap: 10,
+          marginTop: 14,
+          paddingTop: 14,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.line,
+        },
         metric: { flex: 1, gap: 2 },
         boot: {
           ...StyleSheet.absoluteFill,
-          backgroundColor: colors.bg,
           justifyContent: "center",
           paddingHorizontal: 24,
         },
       }),
-    [colors, dock, liveMode, deviceOnline, urgent],
+    [colors, liveMode, deviceOnline, urgent],
   );
 
   return (
@@ -223,12 +236,12 @@ export function LiveMapScreen() {
         ) : null}
 
         <View style={[styles.top, { top: insets.top + 8, zIndex: 5 }]}>
-          <Glass radius={22}>
+          <Glass variant="float" radius={24} intensity={48}>
             <View style={styles.livePill}>
-              <View style={{ paddingLeft: 12, paddingVertical: 10 }}>
+              <View style={{ paddingLeft: 14, paddingVertical: 12 }}>
                 <View style={styles.dot} />
               </View>
-              <View style={{ paddingRight: 14, paddingVertical: 8, gap: 1 }}>
+              <View style={{ paddingRight: 16, paddingVertical: 10, gap: 2 }}>
                 <AppText variant="strong" style={{ fontSize: 14 }}>
                   {liveMode
                     ? connection !== "live"
@@ -272,88 +285,95 @@ export function LiveMapScreen() {
               <Settings size={18} color={colors.ink} strokeWidth={1.75} />
             </IconButton>
             <IconButton label="Recenter on vehicle" testID="recenter" onPress={() => setFollow(true)}>
-              <LocateFixed size={18} color={follow ? colors.signal : colors.ink} strokeWidth={1.75} />
+              <LocateFixed size={18} color={follow ? colors.ink : colors.inkMuted} strokeWidth={1.75} />
             </IconButton>
             {alertsOpen ? (
-              <Glass radius={18} padded>
-                <View style={styles.alertPanel}>
-                  <View style={styles.alertHeader}>
-                    <AppText variant="strong">Open alerts</AppText>
+              <Animated.View entering={reduceMotion ? undefined : FadeInRight.duration(220)}>
+                <Glass variant="card" radius={20} padded intensity={50}>
+                  <View style={styles.alertPanel}>
+                    <View style={styles.alertHeader}>
+                      <AppText variant="strong">Open alerts</AppText>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Close alerts"
+                        hitSlop={10}
+                        onPress={() => setAlertsOpen(false)}
+                      >
+                        <AppText variant="caption" style={{ color: colors.ink }}>
+                          Close
+                        </AppText>
+                      </Pressable>
+                    </View>
+                    {alertPreview.length === 0 ? (
+                      <AppText variant="caption">
+                        {liveMode ? "No alerts from the API" : "No open alerts"}
+                      </AppText>
+                    ) : (
+                      alertPreview.map((alert) => (
+                        <Pressable
+                          key={alert.id}
+                          testID={`alert-chip-${alert.kind}`}
+                          onPress={() => {
+                            setAlertsOpen(false);
+                            router.push("/alerts");
+                          }}
+                          style={styles.alertRow}
+                        >
+                          <AppText variant="strong" numberOfLines={1}>
+                            {alert.title}
+                          </AppText>
+                          <AppText variant="caption">{timeAgo(alert.at)}</AppText>
+                        </Pressable>
+                      ))
+                    )}
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel="Close alerts"
-                      hitSlop={10}
-                      onPress={() => setAlertsOpen(false)}
+                      onPress={() => {
+                        setAlertsOpen(false);
+                        router.push("/alerts");
+                      }}
+                      hitSlop={8}
                     >
-                      <AppText variant="caption" style={{ color: colors.signal }}>
-                        Close
+                      <AppText variant="caption" style={{ color: colors.ink }}>
+                        View all alerts
                       </AppText>
                     </Pressable>
                   </View>
-                  {alertPreview.length === 0 ? (
-                    <AppText variant="caption">
-                      {liveMode ? "No alerts from the API" : "No open alerts"}
-                    </AppText>
-                  ) : (
-                    alertPreview.map((alert) => (
-                      <Pressable
-                        key={alert.id}
-                        testID={`alert-chip-${alert.kind}`}
-                        onPress={() => {
-                          setAlertsOpen(false);
-                          router.push("/alerts");
-                        }}
-                        style={styles.alertRow}
-                      >
-                        <AppText variant="strong" numberOfLines={1}>
-                          {alert.title}
-                        </AppText>
-                        <AppText variant="caption">{timeAgo(alert.at)}</AppText>
-                      </Pressable>
-                    ))
-                  )}
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => {
-                      setAlertsOpen(false);
-                      router.push("/alerts");
-                    }}
-                    hitSlop={8}
-                  >
-                    <AppText variant="caption" style={{ color: colors.signal }}>
-                      View all alerts
-                    </AppText>
-                  </Pressable>
-                </View>
-              </Glass>
+                </Glass>
+              </Animated.View>
             ) : null}
           </View>
         </View>
 
-        <View style={styles.bannerSlot} pointerEvents="box-none">
-          <View style={{ gap: 8 }}>
-            <OfflineBanner />
-            <ApiStatusBanner onRetry={retry} />
-          </View>
-        </View>
       </View>
 
       <Animated.View
         entering={reduceMotion ? undefined : FadeInDown.duration(480)}
-        style={[styles.sheetHost, { bottom: dock - 8 }]}
+        style={[styles.sheetHost, { bottom: dock - 6 }]}
+        pointerEvents="box-none"
       >
+        <View style={styles.banners} pointerEvents="box-none">
+          <OfflineBanner />
+          <ApiStatusBanner onRetry={retry} />
+        </View>
+
         <View style={styles.actions}>
-          <MapAction testID="home-vehicle" label="Vehicle" onPress={openVehicle} icon={<Car size={18} color={colors.ink} strokeWidth={1.75} />} />
+          <MapAction
+            testID="home-vehicle"
+            label="Vehicle"
+            onPress={openVehicle}
+            icon={<Car size={18} color={colors.ink} strokeWidth={1.75} />}
+          />
           <View style={styles.action}>
             <SosButton onPress={askSos} />
           </View>
         </View>
 
-        <Glass radius={28}>
-          <View style={{ paddingHorizontal: 16, paddingVertical: 14 }}>
+        <Glass variant="sheet" radius={30} intensity={52}>
+          <View style={{ paddingHorizontal: 18, paddingVertical: 16 }}>
             <View style={styles.sheetTop}>
               <View style={styles.flex}>
-                <AppText variant="title" numberOfLines={1} style={{ fontSize: 22 }}>
+                <AppText variant="title" numberOfLines={1} style={{ fontSize: 22, lineHeight: 28 }}>
                   {passengerName}
                 </AppText>
                 <AppText variant="caption" numberOfLines={1}>
@@ -362,7 +382,7 @@ export function LiveMapScreen() {
                     : `${headline.status} · ${headline.to}`}
                 </AppText>
               </View>
-              <ScoreRing index={safety.index} status={safety.status} size={52} caption="Safety score" />
+              <ScoreRing index={safety.index} status={safety.status} size={54} caption="Safety" />
             </View>
             <View style={styles.metrics}>
               <Metric label="ETA" value={formatEta(eta)} />
@@ -370,7 +390,7 @@ export function LiveMapScreen() {
               <Metric label="Score" value={String(score)} />
             </View>
             {liveMode ? (
-              <AppText variant="caption" numberOfLines={1} style={{ marginTop: 8 }}>
+              <AppText variant="caption" numberOfLines={1} style={{ marginTop: 10 }}>
                 {deviceOnline ? "Online" : "Offline"}
                 {publisherOnline ? " · cam on" : " · cam off"}
               </AppText>
@@ -380,25 +400,29 @@ export function LiveMapScreen() {
       </Animated.View>
 
       {booting ? (
-        <View style={styles.boot} testID="boot-overlay">
-          <ScreenState
-            kind="loading"
-            title={liveMode ? "Connecting to guardian API" : "Finding the ride"}
-            body={liveMode ? `${rideId} · ${deviceId}` : "BMW M5"}
-          />
-        </View>
+        <ScreenGradient style={styles.boot}>
+          <View testID="boot-overlay">
+            <ScreenState
+              kind="loading"
+              title={liveMode ? "Connecting to guardian API" : "Finding the ride"}
+              body={liveMode ? `${rideId} · ${deviceId}` : "BMW M5"}
+            />
+          </View>
+        </ScreenGradient>
       ) : null}
 
       {!booting && liveMode && connection === "error" ? (
-        <View style={styles.boot} testID="api-error-overlay">
-          <ScreenState
-            kind="error"
-            title="Could not load the ride"
-            body={connectionError ?? "Could not reach http://51.81.81.118:8000. Retry when the API is up."}
-            actionLabel="Retry"
-            onAction={retry}
-          />
-        </View>
+        <ScreenGradient style={styles.boot}>
+          <View testID="api-error-overlay">
+            <ScreenState
+              kind="error"
+              title="Could not load the ride"
+              body={connectionError ?? "Could not reach http://51.81.81.118:8000. Retry when the API is up."}
+              actionLabel="Retry"
+              onAction={retry}
+            />
+          </View>
+        </ScreenGradient>
       ) : null}
     </View>
   );
@@ -427,7 +451,7 @@ function MapAction({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <View style={{ flex: 1, gap: 2 }}>
+    <View style={{ flex: 1, gap: 3 }}>
       <AppText variant="label">{label}</AppText>
       <AppText variant="metric" numberOfLines={1} style={{ fontSize: 22 }}>
         {value}

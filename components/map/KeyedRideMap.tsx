@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
 
-import { buildGoogleMapHtml } from "@/components/map/googleMapDocument";
 import { buildTileMapHtml } from "@/components/map/tileMapDocument";
 import type { RideMapProps } from "@/components/map/types";
 import { ScreenState } from "@/components/ui/ScreenState";
@@ -11,6 +10,10 @@ import { useTheme } from "@/providers/ThemeProvider";
 
 type Props = RideMapProps & { apiKey: string };
 
+/**
+ * Live map host. Uses Mapbox raster tiles when a token is present.
+ * Mapbox GL JS is avoided here — Android WebViews often lack reliable WebGL.
+ */
 export function KeyedRideMap({
   apiKey,
   route,
@@ -25,42 +28,43 @@ export function KeyedRideMap({
   onPressVehicle,
 }: Props) {
   const webRef = useRef<WebView>(null);
-  const [source, setSource] = useState<"google" | "tiles">(apiKey ? "google" : "tiles");
   const [broken, setBroken] = useState(false);
   const { scheme, colors } = useTheme();
   const reduceMotion = useReduceMotion();
-  const regionKey = `${position.latitude.toFixed(1)},${position.longitude.toFixed(1)}-${scheme}`;
+  const token = apiKey.trim();
+  const regionKey = `${position.latitude.toFixed(1)},${position.longitude.toFixed(1)}-${scheme}-${token ? "mb" : "esri"}-leaflet-v1`;
   const mapOrigin = origin ?? position;
   const mapDestination = destination ?? position;
+
   const html = useMemo(
     () =>
-      source === "tiles"
-        ? buildTileMapHtml({
-            route,
-            origin: mapOrigin,
-            destination: mapDestination,
-            position,
-            heading,
-            trail,
-            deviceFix,
-            follow,
-            scheme,
-            reduceMotion,
-          })
-        : buildGoogleMapHtml({
-            apiKey,
-            route,
-            origin: mapOrigin,
-            destination: mapDestination,
-            position,
-            heading,
-            trail,
-            deviceFix,
-            follow,
-            scheme,
-            reduceMotion,
-          }),
-    [source, apiKey, regionKey, scheme, reduceMotion],
+      buildTileMapHtml({
+        route,
+        origin: mapOrigin,
+        destination: mapDestination,
+        position,
+        heading,
+        trail,
+        deviceFix,
+        follow,
+        scheme,
+        reduceMotion,
+        mapboxToken: token || undefined,
+      }),
+    [
+      token,
+      regionKey,
+      reduceMotion,
+      route,
+      mapOrigin,
+      mapDestination,
+      position,
+      heading,
+      trail,
+      deviceFix,
+      follow,
+      scheme,
+    ],
   );
 
   const latest = useRef({ route, position, heading, trail, follow, deviceFix });
@@ -78,7 +82,15 @@ export function KeyedRideMap({
   if (broken) {
     return (
       <View style={[styles.fill, { backgroundColor: colors.mapBg }]}>
-        <ScreenState kind="error" title="The map did not open" body="The street map could not be loaded. Check the connection, then reload VMS." />
+        <ScreenState
+          kind="error"
+          title="The map did not open"
+          body={
+            token
+              ? "Mapbox tiles could not load. Check the token and network, then reload VMS."
+              : "The street map could not be loaded. Check the connection, then reload VMS."
+          }
+        />
       </View>
     );
   }
@@ -86,7 +98,7 @@ export function KeyedRideMap({
   return (
     <View style={[styles.fill, { backgroundColor: colors.mapBg }]}>
       <WebView
-        key={`${regionKey}-${source}`}
+        key={regionKey}
         containerStyle={{ backgroundColor: colors.mapBg }}
         ref={webRef}
         testID="ride-map"
@@ -103,16 +115,13 @@ export function KeyedRideMap({
         overScrollMode="never"
         androidLayerType="hardware"
         onLoadEnd={push}
-        onError={() => {
-          if (source === "google") setSource("tiles");
-          else setBroken(true);
-        }}
+        onError={() => setBroken(true)}
         onMessage={(event) => {
           try {
             const message = JSON.parse(event.nativeEvent.data) as { type?: string };
             if (message.type === "pan") onPan();
             if (message.type === "vehicle") onPressVehicle();
-            if (message.type === "auth") setSource("tiles");
+            if (message.type === "auth") setBroken(true);
           } catch {
             // Page noise, not a map event.
           }

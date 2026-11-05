@@ -1,10 +1,13 @@
 import { useMemo, type ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { selectionFeedback } from "@/utils/haptics";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
 import { AppText } from "@/components/ui/AppText";
 import { radius } from "@/constants/theme";
 import { useTheme } from "@/providers/ThemeProvider";
+import { selectionFeedback } from "@/utils/haptics";
 
 type Tone = "lime" | "ghost" | "danger" | "quiet";
 
@@ -16,73 +19,97 @@ type Props = {
   testID?: string;
 };
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 export function Button({ label, onPress, tone = "lime", disabled = false, testID }: Props) {
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
+  const scale = useSharedValue(1);
+
+  // "lime" tone is remapped to monochrome primary — keeps call sites working.
+  const isPrimary = tone === "lime";
   const styles = useMemo(
     () =>
       StyleSheet.create({
         base: {
-          minHeight: 48,
-          borderRadius: radius.md,
+          minHeight: 50,
+          borderRadius: radius.lg,
           alignItems: "center",
           justifyContent: "center",
-          paddingHorizontal: 16,
+          paddingHorizontal: 18,
+          overflow: "hidden",
         },
-        lime: { backgroundColor: colors.lime },
+        primary: {
+          backgroundColor: colors.primary,
+        },
         ghost: {
           backgroundColor: "transparent",
-          borderWidth: 1,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.lineStrong,
         },
         danger: { backgroundColor: colors.danger },
         quiet: { backgroundColor: colors.bgSoft },
         disabled: { opacity: 0.4 },
-        label: { fontSize: 15 },
-        limeLabel: { color: colors.limeInk },
+        label: { fontSize: 16, letterSpacing: -0.2 },
+        primaryLabel: { color: colors.onPrimary },
         dangerLabel: { color: colors.onDanger },
         ghostLabel: { color: colors.ink },
-        icon: {
-          width: 48,
-          height: 48,
-          borderRadius: 24,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: colors.glass,
-          borderWidth: 1,
-          borderColor: colors.line,
-        },
       }),
     [colors],
   );
 
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   return (
-    <Pressable
+    <AnimatedPressable
       testID={testID}
       accessibilityRole="button"
       disabled={disabled}
+      onPressIn={() => {
+        scale.value = withSpring(0.97, { damping: 18, stiffness: 320 });
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, { damping: 16, stiffness: 280 });
+      }}
       onPress={() => {
         void selectionFeedback();
         onPress();
       }}
-      style={({ pressed }) => [
+      style={[
         styles.base,
-        styles[tone],
+        isPrimary && styles.primary,
+        tone === "ghost" && styles.ghost,
+        tone === "danger" && styles.danger,
+        tone === "quiet" && styles.quiet,
         disabled && styles.disabled,
-        pressed && !disabled && { opacity: 0.82, transform: [{ scale: 0.98 }] },
+        animatedStyle,
       ]}
     >
+      {isPrimary ? (
+        <LinearGradient
+          colors={
+            scheme === "dark"
+              ? ["#FFFFFF", "#E8E8ED"]
+              : ["#2C2C2E", "#1C1C1E"]
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
       <AppText
         variant="strong"
         style={[
           styles.label,
-          tone === "lime" && styles.limeLabel,
+          isPrimary && styles.primaryLabel,
           tone === "danger" && styles.dangerLabel,
           (tone === "ghost" || tone === "quiet") && styles.ghostLabel,
         ]}
       >
         {label}
       </AppText>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -91,42 +118,65 @@ export function IconButton({
   onPress,
   children,
   testID,
+  glass = true,
 }: {
   label: string;
   onPress: () => void;
   children: ReactNode;
   testID?: string;
+  glass?: boolean;
 }) {
   const { colors } = useTheme();
+  const scale = useSharedValue(1);
   const styles = useMemo(
     () =>
       StyleSheet.create({
-        icon: {
-          width: 48,
-          height: 48,
-          borderRadius: 24,
+        host: {
+          width: 46,
+          height: 46,
+          borderRadius: 23,
+          overflow: "hidden",
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.glassBorder,
+          backgroundColor: glass ? colors.glass : colors.bgRaised,
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: colors.glass,
-          borderWidth: 1,
-          borderColor: colors.line,
         },
       }),
-    [colors],
+    [colors, glass],
   );
 
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   return (
-    <Pressable
+    <AnimatedPressable
       testID={testID}
       accessibilityLabel={label}
       accessibilityRole="button"
+      onPressIn={() => {
+        scale.value = withSpring(0.92, { damping: 18, stiffness: 340 });
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, { damping: 14, stiffness: 280 });
+      }}
       onPress={() => {
         void selectionFeedback();
         onPress();
       }}
-      style={({ pressed }) => [styles.icon, pressed && { opacity: 0.82, transform: [{ scale: 0.96 }] }]}
+      style={[styles.host, animatedStyle]}
     >
+      {glass ? <BlurView intensity={36} tint={colors.blurTint} style={StyleSheet.absoluteFill} /> : null}
+      {glass ? (
+        <LinearGradient
+          colors={[...colors.cardGradient]}
+          start={{ x: 0.2, y: 0 }}
+          end={{ x: 0.8, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
       <View>{children}</View>
-    </Pressable>
+    </AnimatedPressable>
   );
 }

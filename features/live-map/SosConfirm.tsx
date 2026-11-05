@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import { BlurView } from "expo-blur";
 import { Haptics, notificationFeedback } from "@/utils/haptics";
 
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
+import { useReduceMotion } from "@/hooks/useReduceMotion";
 import { useTheme } from "@/providers/ThemeProvider";
 import { useRideStore } from "@/stores/useRideStore";
 
@@ -12,15 +15,27 @@ export function SosConfirm() {
   const cancel = useRideStore((state) => state.cancelSos);
   const confirm = useRideStore((state) => state.confirmSos);
   const { colors } = useTheme();
+  const reduceMotion = useReduceMotion();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (!open) return null;
 
   return (
-    <View style={[styles.backdrop, { backgroundColor: colors.scrim }]} testID="sos-confirm">
-      <Pressable style={StyleSheet.absoluteFill} onPress={busy ? undefined : cancel} />
-      <View style={[styles.card, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}>
-        <AppText variant="title">Raise SOS for this ride</AppText>
+    <Animated.View
+      entering={reduceMotion ? undefined : FadeIn.duration(180)}
+      style={styles.backdrop}
+      testID="sos-confirm"
+    >
+      <BlurView intensity={28} tint={colors.blurTint} style={StyleSheet.absoluteFill} />
+      <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }]} onPress={busy ? undefined : cancel} />
+      <Animated.View
+        entering={reduceMotion ? undefined : FadeInDown.springify().damping(18)}
+        style={[styles.card, { backgroundColor: colors.bgRaised, borderColor: colors.glassBorder }]}
+      >
+        <View style={[styles.accent, { backgroundColor: colors.danger }]} />
+        <AppText variant="title" style={{ fontSize: 26 }}>
+          Raise SOS for this ride
+        </AppText>
         <AppText variant="body">
           People with sharing on are notified, and this ride is marked Emergency.
         </AppText>
@@ -49,8 +64,8 @@ export function SosConfirm() {
             />
           </View>
         </View>
-      </View>
-    </View>
+      </Animated.View>
+    </Animated.View>
   );
 }
 
@@ -62,11 +77,18 @@ const styles = StyleSheet.create({
     zIndex: 30,
   },
   card: {
-    borderRadius: 28,
-    borderWidth: 1,
-    padding: 20,
-    gap: 10,
+    borderRadius: 32,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 22,
+    gap: 12,
     marginBottom: 12,
+    overflow: "hidden",
+  },
+  accent: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 4,
   },
   row: {
     flexDirection: "row",

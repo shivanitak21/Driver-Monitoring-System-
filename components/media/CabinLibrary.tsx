@@ -63,17 +63,17 @@ export function CabinLibrary({ recordings, snapshots }: Props) {
         thumb: {
           width: 132,
           height: 96,
-          borderRadius: 16,
+          borderRadius: 18,
           backgroundColor: colors.bgSoft,
         },
         player: {
           height: 220,
-          borderRadius: 18,
+          borderRadius: 20,
           overflow: "hidden",
           backgroundColor: "#000",
         },
         card: {
-          borderRadius: 18,
+          borderRadius: 22,
           backgroundColor: colors.bgRaised,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.line,

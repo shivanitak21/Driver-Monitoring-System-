@@ -18,10 +18,10 @@ type MapDocumentInput = {
 
 export function buildGoogleMapHtml(input: MapDocumentInput) {
   const scheme = input.scheme;
-  const background = scheme === "light" ? "#E4E7EB" : "#101216";
-  const trail = scheme === "light" ? "#4C6110" : "#D7F76B";
-  const road = scheme === "light" ? "rgba(23,25,29,0.28)" : "rgba(245,246,247,0.38)";
-  const dest = scheme === "light" ? "#1F6F6A" : "#8FD4D0";
+  const background = scheme === "light" ? "#E6E8EB" : "#12151A";
+  const trail = scheme === "light" ? "#1C1C1E" : "#F5F5F7";
+  const road = scheme === "light" ? "rgba(23,25,29,0.28)" : "rgba(245,246,247,0.42)";
+  const dest = scheme === "light" ? "#3A3A3C" : "#D1D1D6";
   const origin = scheme === "light" ? "#6A7180" : "#8E949E";
   const snapshot = JSON.stringify({
     route: input.route,

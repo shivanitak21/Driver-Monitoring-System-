@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 
 import { Page } from "@/components/layout/Page";
@@ -8,7 +8,7 @@ import { CabinMediaBar } from "@/components/media/CabinMediaBar";
 import { SeatOccupancyGrid } from "@/components/safety/SeatOccupancyGrid";
 import { ApiStatusBanner } from "@/components/system/ApiStatusBanner";
 import { StatusChip } from "@/components/system/StatusChip";
-import { Button } from "@/components/ui/Button";
+import { Button, IconButton } from "@/components/ui/Button";
 import { Settings } from "@/components/ui/icons";
 import { ScreenState } from "@/components/ui/ScreenState";
 import { driverStateLabel } from "@/constants/liveMap";
@@ -16,7 +16,6 @@ import { useLiveApiRefresh } from "@/hooks/useLiveApiRefresh";
 import { useTheme } from "@/providers/ThemeProvider";
 import { services } from "@/services/createServices";
 import { useRideStore } from "@/stores/useRideStore";
-import { selectionFeedback } from "@/utils/haptics";
 
 type Phase = "idle" | "loading" | "live" | "error";
 
@@ -89,12 +88,7 @@ export function CabinScreen() {
       alive = false;
       clearTimeout(timer);
     };
-  }, [
-    consent,
-    fault,
-    liveMode,
-    refreshLive,
-  ]);
+  }, [consent, fault, liveMode, refreshLive]);
 
   useEffect(() => {
     if (!liveMode || !consent || phase !== "live") return;
@@ -112,18 +106,8 @@ export function CabinScreen() {
       StyleSheet.create({
         stack: { gap: 18 },
         chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-        settings: {
-          width: 40,
-          height: 40,
-          borderRadius: 20,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: colors.bgRaised,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.line,
-        },
       }),
-    [colors],
+    [],
   );
 
   const onRefresh = () => {
@@ -133,20 +117,13 @@ export function CabinScreen() {
   return (
     <Page
       title="Cabin"
+      subtitle="Cameras · occupancy · media"
       refreshing={refreshing}
       onRefresh={liveMode ? onRefresh : undefined}
       action={
-        <Pressable
-          accessibilityLabel="Settings"
-          accessibilityRole="button"
-          onPress={() => {
-            void selectionFeedback();
-            router.push("/settings");
-          }}
-          style={styles.settings}
-        >
+        <IconButton label="Settings" onPress={() => router.push("/settings")} glass={false}>
           <Settings size={18} color={colors.ink} strokeWidth={1.75} />
-        </Pressable>
+        </IconButton>
       }
     >
       <View style={{ marginBottom: 10 }}>
@@ -189,7 +166,10 @@ export function CabinScreen() {
           <View style={styles.chips}>
             <StatusChip label={driverStateLabel(driverState)} tone={attentive ? "ok" : "danger"} />
             {deviceState ? (
-              <StatusChip label={deviceState === "online" ? "Online" : "Offline"} tone={deviceState === "online" ? "ok" : "warn"} />
+              <StatusChip
+                label={deviceState === "online" ? "Online" : "Offline"}
+                tone={deviceState === "online" ? "ok" : "warn"}
+              />
             ) : null}
             <StatusChip label={publisherOnline ? "Cameras on" : "Cameras off"} tone={publisherOnline ? "ok" : "warn"} />
           </View>

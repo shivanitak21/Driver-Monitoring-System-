@@ -17,7 +17,7 @@ export function SosButton({ onPress }: { onPress: () => void }) {
       scale.value = 1;
       return;
     }
-    scale.value = withRepeat(withTiming(1.16, { duration: 1400 }), -1, true);
+    scale.value = withRepeat(withTiming(1.18, { duration: 1500 }), -1, true);
   }, [reduceMotion, scale]);
 
   const ring = useAnimatedStyle(() => ({
@@ -38,7 +38,14 @@ export function SosButton({ onPress }: { onPress: () => void }) {
         }}
         style={({ pressed }) => [
           styles.button,
-          { backgroundColor: colors.danger },
+          {
+            backgroundColor: colors.danger,
+            shadowColor: colors.danger,
+            shadowOpacity: 0.45,
+            shadowRadius: 12,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 6,
+          },
           pressed && styles.pressed,
         ]}
       >
@@ -52,22 +59,22 @@ export function SosButton({ onPress }: { onPress: () => void }) {
 
 const styles = StyleSheet.create({
   wrap: {
-    width: 56,
-    height: 56,
+    width: 58,
+    height: 58,
     alignItems: "center",
     justifyContent: "center",
   },
   pulse: {
     position: "absolute",
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     opacity: 0.28,
   },
   button: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -75,7 +82,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.96 }],
   },
   label: {
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
     fontSize: 13,
   },
 });

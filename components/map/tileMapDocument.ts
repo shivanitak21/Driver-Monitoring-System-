@@ -12,22 +12,24 @@ type TileMapInput = {
   follow: boolean;
   scheme: "light" | "dark";
   reduceMotion: boolean;
+  /** When set, use Mapbox raster tiles (works in Android WebView without WebGL). */
+  mapboxToken?: string;
 };
 
-/** Street map used when the Google Maps JavaScript API rejects the key. */
+/**
+ * Leaflet + raster tiles. Custom tile math broke on zoom; Leaflet keeps tiles visible.
+ * Same window.updateRide contract as before.
+ */
 export function buildTileMapHtml(input: TileMapInput) {
   const scheme = input.scheme;
-  const background = scheme === "light" ? "#E4E7EB" : "#1C1C1C";
-  const tiles =
-    scheme === "light"
-      ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/"
-      : "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/";
-  const trail = scheme === "light" ? "#4C6110" : "#D7F76B";
-  const road = scheme === "light" ? "rgba(23,25,29,0.55)" : "rgba(245,246,247,0.82)";
-  const dest = scheme === "light" ? "#1F6F6A" : "#8FD4D0";
+  const background = scheme === "light" ? "#E6E8EB" : "#12151A";
+  const token = input.mapboxToken?.trim() ?? "";
+  const useMapbox = token.length > 0;
+  const mapboxStyle = scheme === "light" ? "mapbox/light-v11" : "mapbox/dark-v11";
+  const trail = scheme === "light" ? "#1C1C1E" : "#F5F5F7";
+  const road = scheme === "light" ? "rgba(23,25,29,0.45)" : "rgba(245,246,247,0.55)";
+  const dest = scheme === "light" ? "#3A3A3C" : "#D1D1D6";
   const origin = scheme === "light" ? "#6A7180" : "#C5CCD4";
-  const ink = scheme === "light" ? "#5C6370" : "#A1A6AF";
-  const chip = scheme === "light" ? "rgba(255,255,255,0.9)" : "rgba(16,18,22,0.82)";
   const snapshot = JSON.stringify({
     route: input.route,
     origin: input.origin,
@@ -39,198 +41,122 @@ export function buildTileMapHtml(input: TileMapInput) {
     follow: input.follow,
     reduceMotion: input.reduceMotion,
     background,
-    tiles,
+    useMapbox,
+    mapboxToken: token,
+    mapboxStyle,
     trailColor: trail,
     roadColor: road,
     destColor: dest,
     originColor: origin,
   });
-  const icon = JSON.stringify(carMarkerSvg(0));
+  const iconAtZero = JSON.stringify(carMarkerSvg(0));
 
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    html, body, #map { height: 100%; margin: 0; background: ${background}; overflow: hidden; touch-action: none; }
-    #map { position: relative; }
-    .tile { position: absolute; width: 256px; height: 256px; pointer-events: none; }
-    #overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-    #car { position: absolute; width: 56px; height: 56px; z-index: 2; }
-    .attr {
-      position: absolute; top: 8px; right: 8px; z-index: 3;
-      font: 500 11px/1.2 sans-serif; color: ${ink};
-      background: ${chip}; border-radius: 8px; padding: 4px 6px;
+    html, body, #map { height: 100%; margin: 0; background: ${background}; }
+    .leaflet-container { background: ${background}; font: 12px/1.4 system-ui, sans-serif; }
+    .car-icon {
+      width: 56px;
+      height: 56px;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
     }
-    .zoom {
-      position: absolute; right: 16px; top: 46%; transform: translateY(-50%);
-      z-index: 4; display: flex; flex-direction: column; gap: 8px;
-    }
-    .zoom button {
-      width: 44px; height: 44px; border: 0; border-radius: 22px;
-      background: ${chip}; color: ${scheme === "light" ? "#17191D" : "#F5F6F7"};
-      font: 500 22px/1 sans-serif;
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid ${background};
+      box-sizing: border-box;
     }
   </style>
 </head>
 <body>
-  <div id="map">
-    <svg id="overlay" xmlns="http://www.w3.org/2000/svg"></svg>
-    <img id="car" alt="" />
-    <div class="zoom">
-      <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
-      <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
-    </div>
-    <div class="attr">© Esri</div>
-  </div>
+  <div id="map"></div>
   <script>
     const snapshot = ${snapshot};
-    const icon = ${icon};
-    const state = {
-      level: 15,
-      follow: snapshot.follow,
-      route: snapshot.route || [],
-      trail: snapshot.trail || [],
-      origin: snapshot.origin,
-      destination: snapshot.destination,
-      deviceFix: snapshot.deviceFix,
-      cam: { x: 0, y: 0 },
-      ready: false,
-      queued: null,
-      raf: 0,
-      drag: null,
-      moved: false,
-      tiles: new Map(),
-      display: { lat: snapshot.position.latitude, lng: snapshot.position.longitude, heading: snapshot.heading || 0 },
-      target: { lat: snapshot.position.latitude, lng: snapshot.position.longitude, heading: snapshot.heading || 0 }
-    };
-    const mapEl = document.getElementById("map");
-    const overlay = document.getElementById("overlay");
-    const car = document.getElementById("car");
-    car.src = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(icon);
+    const iconTemplate = ${iconAtZero};
 
     function post(message) {
       if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(message));
       else if (window.parent && window.parent !== window) window.parent.postMessage(message, "*");
     }
 
-    function world(lat, lng) {
-      const scale = 256 * Math.pow(2, state.level);
-      const x = ((lng + 180) / 360) * scale;
-      const clamped = Math.max(-0.9999, Math.min(0.9999, Math.sin(lat * Math.PI / 180)));
-      const y = (0.5 - Math.log((1 + clamped) / (1 - clamped)) / (4 * Math.PI)) * scale;
-      return { x: x, y: y };
+    function latLng(point) {
+      return [point.latitude, point.longitude];
     }
 
-    function screen(lat, lng) {
-      const point = world(lat, lng);
-      return { x: point.x - state.cam.x + mapEl.clientWidth / 2, y: point.y - state.cam.y + mapEl.clientHeight / 2 };
+    function carIconUrl(heading) {
+      const svg = iconTemplate.replace("rotate(0 48 48)", "rotate(" + heading + " 48 48)");
+      return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
     }
 
-    function followCamera() {
-      if (!state.follow) return;
-      const point = world(state.display.lat, state.display.lng);
-      state.cam.x = point.x;
-      state.cam.y = point.y + mapEl.clientHeight * 0.1;
-    }
-
-    function drawTiles() {
-      const width = mapEl.clientWidth;
-      const height = mapEl.clientHeight;
-      if (width < 2 || height < 2) return;
-      const tileZoom = Math.max(3, Math.min(18, Math.round(state.level)));
-      const tileSize = 256 * Math.pow(2, state.level - tileZoom);
-      const left = state.cam.x - width / 2;
-      const top = state.cam.y - height / 2;
-      const n = Math.pow(2, tileZoom);
-      const x0 = Math.floor(left / tileSize) - 1;
-      const y0 = Math.floor(top / tileSize) - 1;
-      const x1 = Math.floor((left + width) / tileSize) + 1;
-      const y1 = Math.floor((top + height) / tileSize) + 1;
-      const live = new Set();
-      for (let ty = y0; ty <= y1; ty += 1) {
-        if (ty < 0 || ty >= n) continue;
-        for (let tx = x0; tx <= x1; tx += 1) {
-          const wrapped = ((tx % n) + n) % n;
-          const key = tileZoom + "/" + ty + "/" + wrapped;
-          live.add(key);
-          let img = state.tiles.get(key);
-          if (!img) {
-            img = document.createElement("img");
-            img.className = "tile";
-            img.alt = "";
-            img.draggable = false;
-            img.src = snapshot.tiles + tileZoom + "/" + ty + "/" + wrapped;
-            mapEl.insertBefore(img, overlay);
-            state.tiles.set(key, img);
-          }
-          img.style.width = tileSize + "px";
-          img.style.height = tileSize + "px";
-          img.style.left = (tx * tileSize - left) + "px";
-          img.style.top = (ty * tileSize - top) + "px";
-        }
-      }
-      state.tiles.forEach(function (img, key) {
-        if (!live.has(key)) {
-          img.remove();
-          state.tiles.delete(key);
-        }
+    function makeCarIcon(heading) {
+      return L.divIcon({
+        className: "",
+        html: '<div class="car-icon" style="background-image:url(\\'' + carIconUrl(heading) + '\\')"></div>',
+        iconSize: [56, 56],
+        iconAnchor: [28, 28]
       });
     }
 
-    function svgLine(points, color, width) {
-      const node = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-      node.setAttribute("fill", "none");
-      node.setAttribute("stroke", color);
-      node.setAttribute("stroke-width", String(width));
-      node.setAttribute("stroke-linecap", "round");
-      node.setAttribute("stroke-linejoin", "round");
-      node.setAttribute("points", points);
-      return node;
+    function makeDot(color, size) {
+      return L.divIcon({
+        className: "",
+        html: '<div class="dot" style="width:' + size + 'px;height:' + size + 'px;background:' + color + '"></div>',
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2]
+      });
     }
 
-    function dot(lat, lng, color, radius) {
-      const point = screen(lat, lng);
-      const node = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      node.setAttribute("cx", String(point.x));
-      node.setAttribute("cy", String(point.y));
-      node.setAttribute("r", String(radius));
-      node.setAttribute("fill", color);
-      return node;
-    }
-
-    function series(list) {
-      return (list || []).map(function (point) {
-        const at = screen(point.latitude, point.longitude);
-        return at.x + "," + at.y;
-      }).join(" ");
-    }
-
-    function draw() {
-      followCamera();
-      drawTiles();
-      const width = mapEl.clientWidth;
-      const height = mapEl.clientHeight;
-      overlay.setAttribute("viewBox", "0 0 " + width + " " + height);
-      const nodes = [];
-      if ((state.route || []).length > 1) nodes.push(svgLine(series(state.route), snapshot.roadColor, 4));
-      if ((state.trail || []).length > 1) nodes.push(svgLine(series(state.trail), snapshot.trailColor, 4));
-      if (state.origin) nodes.push(dot(state.origin.latitude, state.origin.longitude, snapshot.originColor, 5));
-      if (state.destination) nodes.push(dot(state.destination.latitude, state.destination.longitude, snapshot.destColor, 7));
-      if (state.deviceFix) nodes.push(dot(state.deviceFix.latitude, state.deviceFix.longitude, "#7EB6FF", 6));
-      overlay.replaceChildren.apply(overlay, nodes);
-      const at = screen(state.display.lat, state.display.lng);
-      car.style.left = (at.x - 28) + "px";
-      car.style.top = (at.y - 28) + "px";
-      car.style.transform = "rotate(" + state.display.heading + "deg)";
-    }
+    const state = {
+      map: null,
+      routeLine: null,
+      trailLine: null,
+      originMarker: null,
+      destMarker: null,
+      deviceMarker: null,
+      carMarker: null,
+      follow: !!snapshot.follow,
+      userNav: false,
+      heading: snapshot.heading || 0,
+      iconHeading: null,
+      ready: false,
+      queued: null,
+      raf: 0,
+      display: {
+        lat: snapshot.position.latitude,
+        lng: snapshot.position.longitude,
+        heading: snapshot.heading || 0
+      },
+      target: {
+        lat: snapshot.position.latitude,
+        lng: snapshot.position.longitude,
+        heading: snapshot.heading || 0
+      }
+    };
 
     function wrap(delta) {
       let value = delta;
       while (value > 180) value -= 360;
       while (value < -180) value += 360;
       return value;
+    }
+
+    function setCar(lat, lng, heading) {
+      if (!state.carMarker) return;
+      state.carMarker.setLatLng([lat, lng]);
+      const rounded = Math.round(heading);
+      if (state.iconHeading === null || Math.abs(rounded - state.iconHeading) >= 4) {
+        state.iconHeading = rounded;
+        state.carMarker.setIcon(makeCarIcon(heading));
+      }
     }
 
     function tick() {
@@ -243,13 +169,28 @@ export function buildTileMapHtml(input: TileMapInput) {
       state.display.lat += dLat * step;
       state.display.lng += dLng * step;
       state.display.heading += dH * step;
-      draw();
-      const done = Math.abs(state.target.lat - state.display.lat) < 0.00001 && Math.abs(state.target.lng - state.display.lng) < 0.00001 && Math.abs(wrap(state.target.heading - state.display.heading)) < 0.4;
+      setCar(state.display.lat, state.display.lng, state.display.heading);
+      if (state.follow && state.map) {
+        const center = [state.display.lat - 0.0028, state.display.lng];
+        if (jump) state.map.setView(center, state.map.getZoom(), { animate: false });
+        else state.map.panTo(center, { animate: false });
+      }
+      const done =
+        Math.abs(state.target.lat - state.display.lat) < 0.00001 &&
+        Math.abs(state.target.lng - state.display.lng) < 0.00001 &&
+        Math.abs(wrap(state.target.heading - state.display.heading)) < 0.4;
       if (!done) state.raf = requestAnimationFrame(tick);
     }
 
     function kick() {
       if (!state.raf) state.raf = requestAnimationFrame(tick);
+    }
+
+    function stopFollow() {
+      if (state.userNav && !state.follow) return;
+      state.follow = false;
+      state.userNav = true;
+      post({ type: "pan" });
     }
 
     function apply(data) {
@@ -261,143 +202,141 @@ export function buildTileMapHtml(input: TileMapInput) {
         state.queued = data;
         return;
       }
+
       if (data.route && data.route.length) {
-        state.route = data.route;
-        state.origin = data.route[0];
-        state.destination = data.route[data.route.length - 1];
+        state.routeLine.setLatLngs(data.route.map(latLng));
+        state.originMarker.setLatLng(latLng(data.route[0]));
+        state.destMarker.setLatLng(latLng(data.route[data.route.length - 1]));
       }
-      state.trail = data.trail || [];
-      state.deviceFix = data.deviceFix || null;
-      state.follow = !!data.follow;
-      state.target = { lat: data.position.latitude, lng: data.position.longitude, heading: data.heading || 0 };
+      state.trailLine.setLatLngs((data.trail || []).map(latLng));
+
+      if (data.deviceFix) {
+        state.deviceMarker.setLatLng(latLng(data.deviceFix));
+        state.deviceMarker.setOpacity(1);
+      } else {
+        state.deviceMarker.setOpacity(0);
+      }
+
+      if (!state.userNav) state.follow = !!data.follow;
+      else state.follow = false;
+
+      state.target = {
+        lat: data.position.latitude,
+        lng: data.position.longitude,
+        heading: data.heading || 0
+      };
       kick();
     }
 
     window.updateRide = apply;
-    window.addEventListener("message", function (event) {
-      const data = event.data;
-      if (!data || data.type !== "ride" || !data.payload) return;
-      apply(data.payload);
-    });
-    window.addEventListener("resize", draw);
 
-    const pointers = new Map();
-    let pinch = null;
-    let lastTap = 0;
-
-    function localPoint(event) {
-      const rect = mapEl.getBoundingClientRect();
-      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    function baseLayer() {
+      if (snapshot.useMapbox) {
+        return L.tileLayer(
+          "https://api.mapbox.com/styles/v1/" + snapshot.mapboxStyle + "/tiles/{z}/{x}/{y}?access_token=" + encodeURIComponent(snapshot.mapboxToken),
+          {
+            tileSize: 512,
+            zoomOffset: -1,
+            minZoom: 2,
+            maxZoom: 20,
+            attribution: "© Mapbox © OpenStreetMap",
+            updateWhenZooming: true,
+            keepBuffer: 6,
+            crossOrigin: true
+          }
+        );
+      }
+      const url =
+        snapshot.background === "#E6E8EB"
+          ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+          : "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+      return L.tileLayer(url, {
+        minZoom: 3,
+        maxZoom: 19,
+        attribution: "© Esri",
+        updateWhenZooming: true,
+        keepBuffer: 4
+      });
     }
 
-    function span(points) {
-      const first = points[0];
-      const second = points[1];
-      return Math.hypot(first.x - second.x, first.y - second.y);
-    }
-
-    function setLevel(next, sx, sy) {
-      const clamped = Math.max(11, Math.min(18, next));
-      if (Math.abs(clamped - state.level) < 0.001) return;
-      const width = mapEl.clientWidth;
-      const height = mapEl.clientHeight;
-      const anchorX = state.cam.x - width / 2 + sx;
-      const anchorY = state.cam.y - height / 2 + sy;
-      const factor = Math.pow(2, clamped - state.level);
-      state.level = clamped;
-      state.cam.x = anchorX * factor - sx + width / 2;
-      state.cam.y = anchorY * factor - sy + height / 2;
-      state.follow = false;
-      draw();
-    }
-
-    mapEl.addEventListener("wheel", function (event) {
-      event.preventDefault();
-      const at = localPoint(event);
-      setLevel(state.level + (event.deltaY < 0 ? 0.6 : -0.6), at.x, at.y);
-      post({ type: "pan" });
-    }, { passive: false });
-
-    document.getElementById("zoom-in").addEventListener("click", function (event) {
-      event.stopPropagation();
-      setLevel(Math.round(state.level) + 1, mapEl.clientWidth / 2, mapEl.clientHeight * 0.4);
-      post({ type: "pan" });
-    });
-    document.getElementById("zoom-out").addEventListener("click", function (event) {
-      event.stopPropagation();
-      setLevel(Math.round(state.level) - 1, mapEl.clientWidth / 2, mapEl.clientHeight * 0.4);
-      post({ type: "pan" });
-    });
-
-    mapEl.addEventListener("pointerdown", function (event) {
-      if (event.target.closest && event.target.closest(".zoom")) return;
-      if (event.target === car) return;
-      pointers.set(event.pointerId, localPoint(event));
-      if (pointers.size >= 2) {
-        const points = Array.from(pointers.values());
-        pinch = { dist: span(points), level: state.level };
-        state.drag = null;
+    function init() {
+      if (!window.L) {
+        post({ type: "auth" });
         return;
       }
-      state.drag = { x: event.clientX, y: event.clientY, camX: state.cam.x, camY: state.cam.y };
-      state.moved = false;
-      mapEl.setPointerCapture(event.pointerId);
-    });
-    mapEl.addEventListener("pointermove", function (event) {
-      if (!pointers.has(event.pointerId)) return;
-      pointers.set(event.pointerId, localPoint(event));
-      if (pointers.size >= 2) {
-        const points = Array.from(pointers.values());
-        const dist = span(points);
-        const mid = { x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 };
-        if (!pinch) pinch = { dist: dist, level: state.level };
-        setLevel(pinch.level + Math.log2(dist / pinch.dist), mid.x, mid.y);
-        state.moved = true;
-        return;
-      }
-      if (!state.drag) return;
-      const dx = event.clientX - state.drag.x;
-      const dy = event.clientY - state.drag.y;
-      if (Math.abs(dx) + Math.abs(dy) < 6) return;
-      state.moved = true;
-      state.follow = false;
-      state.cam.x = state.drag.camX - dx;
-      state.cam.y = state.drag.camY - dy;
-      draw();
-    });
-    mapEl.addEventListener("pointerup", function (event) {
-      if (event.target.closest && event.target.closest(".zoom")) return;
-      pointers.delete(event.pointerId);
-      pinch = null;
-      if (pointers.size === 0 && !state.moved) {
-        const now = Date.now();
-        if (now - lastTap < 280) {
-          const at = localPoint(event);
-          setLevel(state.level + 1, at.x, at.y);
-          post({ type: "pan" });
-          lastTap = 0;
-        } else {
-          lastTap = now;
-        }
-      }
-      if (state.moved && pointers.size === 0) post({ type: "pan" });
-      if (pointers.size === 0) state.drag = null;
-    });
-    mapEl.addEventListener("pointercancel", function (event) {
-      pointers.delete(event.pointerId);
-      pinch = null;
-      state.drag = null;
-    });
-    car.addEventListener("click", function (event) {
-      event.stopPropagation();
-      post({ type: "vehicle" });
-    });
 
-    followCamera();
-    state.ready = true;
-    if (state.queued) apply(state.queued);
-    draw();
-    post({ type: "ready" });
+      const start = latLng(snapshot.position);
+      const center = snapshot.follow
+        ? [snapshot.position.latitude - 0.0028, snapshot.position.longitude]
+        : start;
+
+      state.map = L.map("map", {
+        zoomControl: true,
+        attributionControl: true,
+        zoomSnap: 1,
+        zoomDelta: 1
+      }).setView(center, 15);
+
+      baseLayer().addTo(state.map);
+
+      state.routeLine = L.polyline((snapshot.route || []).map(latLng), {
+        color: snapshot.roadColor,
+        weight: 4,
+        opacity: 0.85,
+        lineJoin: "round"
+      }).addTo(state.map);
+
+      state.trailLine = L.polyline((snapshot.trail || []).map(latLng), {
+        color: snapshot.trailColor,
+        weight: 4,
+        opacity: 0.95,
+        lineJoin: "round"
+      }).addTo(state.map);
+
+      state.originMarker = L.marker(latLng(snapshot.origin), {
+        icon: makeDot(snapshot.originColor, 10),
+        interactive: false
+      }).addTo(state.map);
+
+      state.destMarker = L.marker(latLng(snapshot.destination), {
+        icon: makeDot(snapshot.destColor, 14),
+        interactive: false
+      }).addTo(state.map);
+
+      state.deviceMarker = L.marker(snapshot.deviceFix ? latLng(snapshot.deviceFix) : start, {
+        icon: makeDot("#7EB6FF", 12),
+        interactive: false,
+        opacity: snapshot.deviceFix ? 1 : 0
+      }).addTo(state.map);
+
+      state.carMarker = L.marker(start, {
+        icon: makeCarIcon(snapshot.heading || 0),
+        zIndexOffset: 600
+      }).addTo(state.map);
+      state.iconHeading = Math.round(snapshot.heading || 0);
+      state.carMarker.on("click", function () { post({ type: "vehicle" }); });
+
+      state.map.on("dragstart", stopFollow);
+      state.map.on("zoomstart", stopFollow);
+
+      // Force a layout pass after WebView shows — fixes blank first paint / zoom.
+      setTimeout(function () {
+        state.map.invalidateSize(false);
+      }, 80);
+      setTimeout(function () {
+        state.map.invalidateSize(false);
+      }, 300);
+
+      state.ready = true;
+      if (state.queued) apply(state.queued);
+      post({ type: "ready" });
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", init);
+    } else {
+      init();
+    }
   </script>
 </body>
 </html>`;

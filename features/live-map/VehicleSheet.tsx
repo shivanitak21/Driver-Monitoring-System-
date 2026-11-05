@@ -7,6 +7,7 @@ import { useCallback, useMemo, type RefObject } from "react";
 
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
+import { Glass } from "@/components/ui/Glass";
 import { formatMetric } from "@/constants/liveMap";
 import { vehiclePhotos } from "@/data/photos";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -28,7 +29,7 @@ export function VehicleSheet({ sheetRef }: Props) {
   const { colors } = useTheme();
   const renderBackdrop = useCallback(
     (props: BottomSheetBackdropProps) => (
-      <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.55} />
+      <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.5} />
     ),
     [],
   );
@@ -40,7 +41,7 @@ export function VehicleSheet({ sheetRef }: Props) {
       enableDynamicSizing={false}
       enablePanDownToClose
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: colors.bgRaised, borderTopLeftRadius: 28, borderTopRightRadius: 28 }}
+      backgroundStyle={{ backgroundColor: colors.bgRaised, borderTopLeftRadius: 32, borderTopRightRadius: 32 }}
       handleIndicatorStyle={{ backgroundColor: colors.lineStrong, width: 42 }}
     >
       <BottomSheetScrollView contentContainerStyle={styles.content}>
@@ -61,7 +62,12 @@ export function VehicleSheet({ sheetRef }: Props) {
               }}
               style={{ width: width * 0.72 }}
             >
-              <Image source={photo.source} style={[styles.photo, { backgroundColor: colors.bgSoft }]} contentFit="cover" transition={200} />
+              <Image
+                source={photo.source}
+                style={[styles.photo, { backgroundColor: colors.bgSoft }]}
+                contentFit="cover"
+                transition={200}
+              />
               <AppText variant="caption" style={styles.caption}>
                 {photo.caption}
               </AppText>
@@ -86,16 +92,19 @@ export function VehicleSheet({ sheetRef }: Props) {
 }
 
 function Stat({ label, value, unit }: { label: string; value: string; unit: string }) {
-  const { colors } = useTheme();
   return (
-    <View style={[styles.stat, { backgroundColor: colors.bg, borderColor: colors.line }]}>
-      <AppText variant="label">{label}</AppText>
-      <AppText variant="metric" numberOfLines={1}>
-        {value}
-      </AppText>
-      <AppText variant="caption" numberOfLines={1}>
-        {unit}
-      </AppText>
+    <View style={styles.statHost}>
+      <Glass variant="card" radius={18}>
+        <View style={styles.stat}>
+          <AppText variant="label">{label}</AppText>
+          <AppText variant="metric" numberOfLines={1} style={{ fontSize: 22 }}>
+            {value}
+          </AppText>
+          <AppText variant="caption" numberOfLines={1}>
+            {unit}
+          </AppText>
+        </View>
+      </Glass>
     </View>
   );
 }
@@ -104,7 +113,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
     paddingBottom: 36,
-    gap: 10,
+    gap: 12,
   },
   name: {
     marginTop: 4,
@@ -114,8 +123,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   photo: {
-    height: 180,
-    borderRadius: 20,
+    height: 188,
+    borderRadius: 24,
   },
   caption: {
     marginTop: 8,
@@ -124,11 +133,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
-  stat: {
+  statHost: {
     flex: 1,
+  },
+  stat: {
     borderRadius: 18,
     padding: 12,
-    borderWidth: 1,
     gap: 2,
   },
 });

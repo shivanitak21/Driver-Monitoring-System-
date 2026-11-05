@@ -17,8 +17,8 @@ const NOSE = "M48 18.5L57.2 38.5L48 33.2L38.8 38.5Z";
 
 export const carShapes: Shape[] = [
   { kind: "ellipse", cx: 48, cy: 64, rx: 15, ry: 6, fill: "rgba(0,0,0,0.28)", spin: false },
-  { kind: "path", d: CHEVRON, fill: "#F4F6F8", stroke: "#1A1E0C", strokeWidth: 2.4, spin: true },
-  { kind: "path", d: NOSE, fill: "#D7F76B", spin: true },
+  { kind: "path", d: CHEVRON, fill: "#F5F5F7", stroke: "#1C1C1E", strokeWidth: 2.2, spin: true },
+  { kind: "path", d: NOSE, fill: "#AEAEB2", spin: true },
 ];
 
 function shapeXml(shape: Shape) {

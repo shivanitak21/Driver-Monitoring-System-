@@ -1,10 +1,12 @@
-import { Pressable, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/ui/AppText";
+import { Glass } from "@/components/ui/Glass";
 import { statusColor } from "@/components/ui/ScoreRing";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { SafetyAlert } from "@/types/domain";
 import { alertDescription, cameraLabel } from "@/utils/alerts";
+import { selectionFeedback } from "@/utils/haptics";
 
 type Props = {
   alert: SafetyAlert;
@@ -14,7 +16,7 @@ type Props = {
   onEvidence?: () => void;
 };
 
-export function AlertTimelineItem({ alert, timeLabel, showLine, onAcknowledge, onEvidence }: Props) {
+export function AlertTimelineItem({ alert, timeLabel, showLine: _showLine, onAcknowledge, onEvidence }: Props) {
   const { colors } = useTheme();
   const color = statusColor(
     colors,
@@ -40,40 +42,111 @@ export function AlertTimelineItem({ alert, timeLabel, showLine, onAcknowledge, o
     .join(" · ");
 
   return (
-    <View style={{ flexDirection: "row", gap: 12 }} testID={`alert-${alert.kind}`}>
-      <View style={{ width: 14, alignItems: "center" }}>
-        <View style={{ width: 8, height: 8, borderRadius: 4, marginTop: 6, backgroundColor: color }} />
-        {showLine ? <View style={{ width: 1, flex: 1, backgroundColor: colors.line, marginVertical: 4 }} /> : null}
-      </View>
-      <View style={{ flex: 1, gap: 4, paddingBottom: 16, opacity: alert.acknowledged ? 0.72 : 1 }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-          <AppText variant="strong" numberOfLines={1} style={{ flex: 1 }}>
-            {alert.title}
+    <View style={styles.wrap} testID={`alert-${alert.kind}`}>
+      <Glass variant="card" radius={22}>
+        <View style={[styles.card, alert.acknowledged && styles.acked]}>
+          <View style={styles.head}>
+            <View style={[styles.dot, { backgroundColor: color }]} />
+            <AppText variant="strong" numberOfLines={1} style={styles.title}>
+              {alert.title}
+            </AppText>
+            <AppText variant="caption">{timeLabel}</AppText>
+          </View>
+          <AppText variant="caption" style={styles.desc}>
+            {description}
           </AppText>
-          <AppText variant="caption">{timeLabel}</AppText>
-        </View>
-        <AppText variant="caption">{description}</AppText>
-        <AppText variant="caption">{meta}</AppText>
-        {alert.detail?.trim() && alert.locationLabel?.trim() ? (
-          <AppText variant="caption">{alert.locationLabel}</AppText>
-        ) : null}
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-          {onEvidence ? (
-            <Pressable onPress={onEvidence} accessibilityRole="button" hitSlop={8}>
-              <AppText variant="caption" style={{ color: colors.ink }}>
-                {alert.clipId ? "Clip" : "Details"}
+          <AppText variant="caption" numberOfLines={2} style={{ color: colors.inkFaint }}>
+            {meta}
+          </AppText>
+          {alert.detail?.trim() && alert.locationLabel?.trim() ? (
+            <AppText variant="caption">{alert.locationLabel}</AppText>
+          ) : null}
+          <View style={styles.actions}>
+            {onEvidence ? (
+              <Pressable
+                onPress={() => {
+                  void selectionFeedback();
+                  onEvidence();
+                }}
+                accessibilityRole="button"
+                hitSlop={8}
+                style={[styles.actionBtn, { backgroundColor: colors.bgSoft }]}
+              >
+                <AppText variant="caption" style={{ color: colors.ink }}>
+                  {alert.clipId ? "Clip" : "Details"}
+                </AppText>
+              </Pressable>
+            ) : (
+              <View />
+            )}
+            <Pressable
+              disabled={alert.acknowledged}
+              onPress={() => {
+                void selectionFeedback();
+                onAcknowledge();
+              }}
+              accessibilityRole="button"
+              hitSlop={8}
+              style={[
+                styles.actionBtn,
+                {
+                  backgroundColor: colors.bgSoft,
+                },
+              ]}
+            >
+              <AppText
+                variant="caption"
+                style={{ color: alert.acknowledged ? colors.inkFaint : colors.ink }}
+              >
+                {alert.acknowledged ? "Done" : "Ack"}
               </AppText>
             </Pressable>
-          ) : (
-            <View />
-          )}
-          <Pressable disabled={alert.acknowledged} onPress={onAcknowledge} accessibilityRole="button" hitSlop={8}>
-            <AppText variant="caption" style={{ color: alert.acknowledged ? colors.inkFaint : colors.signal }}>
-              {alert.acknowledged ? "Done" : "Ack"}
-            </AppText>
-          </Pressable>
+          </View>
         </View>
-      </View>
+      </Glass>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  wrap: {
+    marginBottom: 10,
+  },
+  card: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 6,
+  },
+  acked: {
+    opacity: 0.72,
+  },
+  head: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  title: {
+    flex: 1,
+  },
+  desc: {
+    paddingLeft: 18,
+  },
+  actions: {
+    marginTop: 6,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+    paddingLeft: 18,
+  },
+  actionBtn: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+});

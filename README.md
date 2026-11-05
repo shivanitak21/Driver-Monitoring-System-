@@ -15,15 +15,17 @@ Scan the QR code with Expo Go. Press `w` for the browser.
 
 ## Map
 
-Google Maps is optional. Put a browser key in `.env` (gitignored):
+Live map uses **Mapbox raster tiles** (reliable in Expo Go / Android WebView). Put a public token in `.env` (gitignored):
 
 ```bash
-GOOGLE_MAPS_API_KEY=
+EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN=pk.your_token_here
+MAPBOX_ACCESS_TOKEN=pk.your_token_here
 ```
 
-Restart Expo after changing it, and enable **Maps JavaScript API** on the key.
+Create a token at [account.mapbox.com/access-tokens](https://account.mapbox.com/access-tokens/).  
+**Restart Expo after changing it** (`npx expo start --clear`) — env tokens are only read at startup.
 
-Without a key, Android and iOS use the map bundled with Expo Go. The browser draws the route without Google tiles. A store build reads the same key through the `react-native-maps` plugin in `app.config.ts`.
+Without a token, Android falls back to free Esri street tiles. iOS without a token uses Apple Maps.
 
 The app defaults to the demo guardian API:
 

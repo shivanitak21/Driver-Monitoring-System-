@@ -37,7 +37,7 @@ export function buildLiveKitWatchHtml(options: {
       background: #000; border: 0; color: inherit; font: inherit; text-align: left;
     }
     html[data-layout="driver"] .pane-cabin, html[data-layout="cabin"] .pane-driver { display: none; }
-    html[data-selected="driver"] .pane-driver, html[data-selected="cabin"] .pane-cabin { box-shadow: inset 0 0 0 2px #D7F76B; }
+    html[data-selected="driver"] .pane-driver, html[data-selected="cabin"] .pane-cabin { box-shadow: inset 0 0 0 2px #F5F5F7; }
     video, .poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center; }
     .poster { z-index: 0; background: #000; }
     video { z-index: 1; background: transparent; }

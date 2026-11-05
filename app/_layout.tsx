@@ -1,5 +1,6 @@
 import "react-native-gesture-handler";
 
+import { useCallback, useState } from "react";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -11,6 +12,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { View } from "react-native";
 
 import { DeviceLocationBridge, RideClock } from "@/components/system/RideRuntime";
+import { SplashOverlay } from "../components/system/SplashOverlay";
 import { theme } from "@/constants/theme";
 import { CallOverlay } from "@/features/calls/CallOverlay";
 import { SosConfirm } from "@/features/live-map/SosConfirm";
@@ -24,6 +26,8 @@ export default function RootLayout() {
     Manrope_500Medium,
     Manrope_600SemiBold,
   });
+  const [splashDone, setSplashDone] = useState(false);
+  const onSplashFinish = useCallback(() => setSplashDone(true), []);
 
   if (!loaded && !error) {
     return <View style={{ flex: 1, backgroundColor: theme.bg }} />;
@@ -33,14 +37,20 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.bg }}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <AppFrame />
+          <AppFrame splashDone={splashDone} onSplashFinish={onSplashFinish} />
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
 
-function AppFrame() {
+function AppFrame({
+  splashDone,
+  onSplashFinish,
+}: {
+  splashDone: boolean;
+  onSplashFinish: () => void;
+}) {
   const { colors } = useTheme();
 
   return (
@@ -52,7 +62,8 @@ function AppFrame() {
         <Stack
           screenOptions={{
             headerShown: false,
-            animation: "slide_from_right",
+            animation: "fade_from_bottom",
+            animationDuration: 320,
             contentStyle: { backgroundColor: colors.bg },
           }}
         >
@@ -64,6 +75,7 @@ function AppFrame() {
         </Stack>
         <SosConfirm />
         <CallOverlay />
+        {!splashDone ? <SplashOverlay onFinish={onSplashFinish} /> : null}
       </View>
     </BottomSheetModalProvider>
   );

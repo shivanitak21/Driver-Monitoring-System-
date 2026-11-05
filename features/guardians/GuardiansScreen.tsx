@@ -1,15 +1,15 @@
-import { useState } from "react";
-import { Pressable, StyleSheet, Switch, TextInput, View } from "react-native";
+import { useMemo, useState } from "react";
+import { StyleSheet, Switch, TextInput, View } from "react-native";
 import { Settings } from "@/components/ui/icons";
 import { router } from "expo-router";
-import { selectionFeedback } from "@/utils/haptics";
 
 import { Page } from "@/components/layout/Page";
 import { ApiStatusBanner } from "@/components/system/ApiStatusBanner";
 import { AppText } from "@/components/ui/AppText";
-import { Button } from "@/components/ui/Button";
+import { Button, IconButton } from "@/components/ui/Button";
+import { Glass } from "@/components/ui/Glass";
 import { ScreenState } from "@/components/ui/ScreenState";
-import { font } from "@/constants/theme";
+import { typeface } from "@/constants/theme";
 import { timeAgo } from "@/constants/format";
 import { useLiveApiRefresh } from "@/hooks/useLiveApiRefresh";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -39,6 +39,34 @@ export function GuardiansScreen() {
   const [busy, setBusy] = useState(false);
   const sharing = guardians.filter((guardian) => guardian.sharing);
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        summary: { gap: 12, marginBottom: 14, padding: 16 },
+        profile: {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 12,
+          padding: 14,
+        },
+        avatar: {
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.bgSoft,
+        },
+        flex: { flex: 1, gap: 3 },
+        invite: { marginTop: 12 },
+        form: { marginTop: 12, gap: 10, padding: 14 },
+        notices: { marginTop: 22, gap: 10 },
+        notice: { padding: 14, gap: 4 },
+        cardGap: { marginBottom: 10 },
+      }),
+    [colors],
+  );
+
   const onRefresh = () => {
     if (!liveMode) return;
     void Promise.all([refreshGuardians(), refreshNotices()]);
@@ -51,40 +79,39 @@ export function GuardiansScreen() {
       refreshing={refreshing}
       onRefresh={liveMode ? onRefresh : undefined}
       action={
-        <Pressable
+        <IconButton
           testID="open-settings"
-          accessibilityLabel="Settings"
-          accessibilityRole="button"
-          onPress={() => {
-            void selectionFeedback();
-            router.push("/settings");
-          }}
-          style={[styles.settings, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}
+          label="Settings"
+          onPress={() => router.push("/settings")}
+          glass={false}
         >
           <Settings size={18} color={colors.ink} strokeWidth={1.75} />
-        </Pressable>
+        </IconButton>
       }
     >
       <View style={{ marginBottom: 10 }}>
         <ApiStatusBanner onRetry={() => void refreshAll()} />
       </View>
 
-      <View style={styles.summary}>
-        <AppText variant="caption" numberOfLines={2}>
-          {shareLink || "No share link yet"}
-        </AppText>
-        <Button
-          testID="refresh-share"
-          label="Refresh link"
-          tone="ghost"
-          onPress={() => {
-            setBusy(true);
-            void shareTrip()
-              .catch((error: Error) => setFormError(error.message))
-              .finally(() => setBusy(false));
-          }}
-        />
-      </View>
+      <Glass variant="card" radius={22} style={styles.cardGap}>
+        <View style={styles.summary}>
+          <AppText variant="label">Share link</AppText>
+          <AppText variant="caption" numberOfLines={2}>
+            {shareLink || "No share link yet"}
+          </AppText>
+          <Button
+            testID="refresh-share"
+            label="Refresh link"
+            tone="ghost"
+            onPress={() => {
+              setBusy(true);
+              void shareTrip()
+                .catch((error: Error) => setFormError(error.message))
+                .finally(() => setBusy(false));
+            }}
+          />
+        </View>
+      </Glass>
 
       {connectionError ? (
         <AppText variant="caption" style={{ color: colors.dangerSoft, marginBottom: 8 }}>
@@ -104,39 +131,45 @@ export function GuardiansScreen() {
         />
       ) : (
         guardians.map((guardian) => (
-          <View key={guardian.id} style={[styles.profile, { borderTopColor: colors.line }]}>
-            <View style={[styles.avatar, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}>
-              <AppText variant="strong">{initials(guardian.name)}</AppText>
-            </View>
-            <View style={styles.flex}>
-              <AppText variant="strong">{guardian.name}</AppText>
-              <AppText variant="caption">
-                {guardian.relationship || "Guardian"}
-                {guardian.phone ? ` · ${guardian.phone}` : ""}
-              </AppText>
-              <AppText variant="caption" style={{ color: colors.inkFaint }}>
-                {guardian.lastNotifiedAt
-                  ? `Last notified ${timeAgo(guardian.lastNotifiedAt)}`
-                  : "Not notified yet"}
-                {guardian.sharing ? " · Sharing on" : " · Sharing off"}
-              </AppText>
-              {!liveMode ? (
-                <Pressable onPress={() => removeGuardian(guardian.id)} accessibilityRole="button" hitSlop={8}>
-                  <AppText variant="caption" style={{ color: colors.danger }}>
+          <Glass key={guardian.id} variant="card" radius={22} style={styles.cardGap}>
+            <View style={styles.profile}>
+              <View style={styles.avatar}>
+                <AppText variant="strong" style={{ color: colors.ink }}>
+                  {initials(guardian.name)}
+                </AppText>
+              </View>
+              <View style={styles.flex}>
+                <AppText variant="strong">{guardian.name}</AppText>
+                <AppText variant="caption">
+                  {guardian.relationship || "Guardian"}
+                  {guardian.phone ? ` · ${guardian.phone}` : ""}
+                </AppText>
+                <AppText variant="caption" style={{ color: colors.inkFaint }}>
+                  {guardian.lastNotifiedAt
+                    ? `Last notified ${timeAgo(guardian.lastNotifiedAt)}`
+                    : "Not notified yet"}
+                  {guardian.sharing ? " · Sharing on" : " · Sharing off"}
+                </AppText>
+                {!liveMode ? (
+                  <AppText
+                    variant="caption"
+                    style={{ color: colors.danger, marginTop: 2 }}
+                    onPress={() => removeGuardian(guardian.id)}
+                  >
                     Remove
                   </AppText>
-                </Pressable>
-              ) : null}
+                ) : null}
+              </View>
+              <Switch
+                value={guardian.sharing}
+                onValueChange={() => {
+                  void toggleSharing(guardian.id).catch((error: Error) => setFormError(error.message));
+                }}
+                trackColor={{ true: colors.primary, false: colors.bgSoft }}
+                thumbColor={guardian.sharing ? colors.onPrimary : colors.bgRaised}
+              />
             </View>
-            <Switch
-              value={guardian.sharing}
-              onValueChange={() => {
-                void toggleSharing(guardian.id).catch((error: Error) => setFormError(error.message));
-              }}
-              trackColor={{ true: colors.lime, false: colors.bgSoft }}
-              thumbColor={guardian.sharing ? colors.limeInk : colors.bgRaised}
-            />
-          </View>
+          </Glass>
         ))
       )}
 
@@ -145,45 +178,47 @@ export function GuardiansScreen() {
       </View>
 
       {invite ? (
-        <View style={styles.form}>
-          <Field value={name} placeholder="Name" onChangeText={setName} testID="guardian-name" />
-          <Field value={relationship} placeholder="Relationship" onChangeText={setRelationship} />
-          <Field value={phone} placeholder="Phone" onChangeText={setPhone} />
-          {formError ? (
-            <AppText variant="caption" style={{ color: colors.dangerSoft }}>
-              {formError}
-            </AppText>
-          ) : null}
-          <Button
-            testID="add-guardian"
-            label={busy ? "Saving…" : "Save"}
-            onPress={() => {
-              if (!name.trim()) {
-                setFormError("Name is required.");
-                return;
-              }
-              if (!liveMode && (!relationship.trim() || !phone.trim())) {
-                setFormError("Name, relationship, and phone are required.");
-                return;
-              }
-              setBusy(true);
-              setFormError("");
-              void addGuardian({ name, relationship, phone })
-                .then(() => {
-                  setName("");
-                  setRelationship("");
-                  setPhone("");
-                  setInvite(false);
-                })
-                .catch((error: Error) => setFormError(error.message))
-                .finally(() => setBusy(false));
-            }}
-          />
-        </View>
+        <Glass variant="card" radius={22}>
+          <View style={styles.form}>
+            <Field value={name} placeholder="Name" onChangeText={setName} testID="guardian-name" />
+            <Field value={relationship} placeholder="Relationship" onChangeText={setRelationship} />
+            <Field value={phone} placeholder="Phone" onChangeText={setPhone} />
+            {formError ? (
+              <AppText variant="caption" style={{ color: colors.dangerSoft }}>
+                {formError}
+              </AppText>
+            ) : null}
+            <Button
+              testID="add-guardian"
+              label={busy ? "Saving…" : "Save"}
+              onPress={() => {
+                if (!name.trim()) {
+                  setFormError("Name is required.");
+                  return;
+                }
+                if (!liveMode && (!relationship.trim() || !phone.trim())) {
+                  setFormError("Name, relationship, and phone are required.");
+                  return;
+                }
+                setBusy(true);
+                setFormError("");
+                void addGuardian({ name, relationship, phone })
+                  .then(() => {
+                    setName("");
+                    setRelationship("");
+                    setPhone("");
+                    setInvite(false);
+                  })
+                  .catch((error: Error) => setFormError(error.message))
+                  .finally(() => setBusy(false));
+              }}
+            />
+          </View>
+        </Glass>
       ) : null}
 
       <View style={styles.notices}>
-        <AppText variant="strong" style={{ marginBottom: 8 }}>
+        <AppText variant="strong" style={{ marginBottom: 4, marginLeft: 4 }}>
           Notices
         </AppText>
         {notices.length === 0 ? (
@@ -198,13 +233,15 @@ export function GuardiansScreen() {
           />
         ) : (
           notices.map((notice) => (
-            <View key={notice.id} style={[styles.notice, { borderTopColor: colors.line }]}>
-              <AppText variant="strong">{notice.title}</AppText>
-              <AppText variant="caption">{notice.body}</AppText>
-              <AppText variant="caption">
-                {timeAgo(notice.at)} · {notice.guardianNames.join(", ") || "No recipients"}
-              </AppText>
-            </View>
+            <Glass key={notice.id} variant="card" radius={20}>
+              <View style={styles.notice}>
+                <AppText variant="strong">{notice.title}</AppText>
+                <AppText variant="caption">{notice.body}</AppText>
+                <AppText variant="caption" style={{ color: colors.inkFaint }}>
+                  {timeAgo(notice.at)} · {notice.guardianNames.join(", ") || "No recipients"}
+                </AppText>
+              </View>
+            </Glass>
           ))
         )}
       </View>
@@ -241,47 +278,16 @@ function Field({
       placeholderTextColor={colors.inkFaint}
       onChangeText={onChangeText}
       style={{
-        height: 48,
-        borderRadius: 14,
-        borderWidth: 1,
+        height: 50,
+        borderRadius: 16,
+        borderWidth: StyleSheet.hairlineWidth,
         borderColor: colors.line,
         paddingHorizontal: 14,
         color: colors.ink,
-        fontFamily: font.body,
-        backgroundColor: colors.bgRaised,
+        ...typeface("body"),
+        backgroundColor: colors.bgSoft,
+        fontSize: 15,
       }}
     />
   );
 }
-
-const styles = StyleSheet.create({
-  summary: { gap: 10, marginBottom: 8 },
-  profile: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-  flex: { flex: 1, gap: 2 },
-  settings: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-  invite: { marginTop: 8 },
-  form: { marginTop: 12, gap: 8 },
-  notices: { marginTop: 22 },
-  notice: { paddingVertical: 12, borderTopWidth: 1, gap: 4 },
-});

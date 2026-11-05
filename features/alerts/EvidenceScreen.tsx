@@ -6,6 +6,7 @@ import { WebView } from "react-native-webview";
 
 import { Page } from "@/components/layout/Page";
 import { AppText } from "@/components/ui/AppText";
+import { Glass } from "@/components/ui/Glass";
 import { ScreenState } from "@/components/ui/ScreenState";
 import { clock } from "@/constants/format";
 import { ApiError } from "@/services/api/http";
@@ -14,6 +15,7 @@ import { services } from "@/services/createServices";
 import { useTheme } from "@/providers/ThemeProvider";
 import { useRideStore } from "@/stores/useRideStore";
 import type { AlertClip } from "@/types/domain";
+import { selectionFeedback } from "@/utils/haptics";
 
 function channelLabel(channel?: string | null) {
   if (channel === "cms") return "Cabin";
@@ -94,18 +96,18 @@ export function EvidenceScreen() {
   const duration = clip ? clipDurationLabel(clip.startAt, clip.endAt) : null;
 
   return (
-    <Page
-      title={alert.title}
-      subtitle={`${channelLabel(alert.channel)} · ${clock(alert.at)}`}
-      back
-    >
-      <View style={[styles.card, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}>
-        <AppText variant="body">{alert.detail}</AppText>
-        <AppText variant="caption">
-          {alert.severity}
-          {clipId ? ` · clip ${clipId}` : " · no clip"}
-        </AppText>
-      </View>
+    <Page title={alert.title} subtitle={`${channelLabel(alert.channel)} · ${clock(alert.at)}`} back>
+      <Glass variant="card" radius={24} style={{ marginBottom: 14 }}>
+        <View style={styles.card}>
+          <AppText variant="body" style={{ color: colors.ink }}>
+            {alert.detail}
+          </AppText>
+          <AppText variant="caption">
+            {alert.severity}
+            {clipId ? ` · clip ${clipId}` : " · no clip"}
+          </AppText>
+        </View>
+      </Glass>
 
       {!clipId ? (
         <ScreenState
@@ -150,18 +152,26 @@ export function EvidenceScreen() {
 
           {clip.videoUrl ? (
             <>
-              <View style={[styles.player, { borderColor: colors.line }]}>
-                <WebView
-                  originWhitelist={["*"]}
-                  source={{ html: videoHtml }}
-                  style={styles.webview}
-                  allowsInlineMediaPlayback
-                  mediaPlaybackRequiresUserAction={false}
-                  allowsFullscreenVideo
-                />
-              </View>
-              <Pressable onPress={() => void Linking.openURL(clip.videoUrl!)} hitSlop={8}>
-                <AppText variant="caption" style={{ color: colors.signal }}>
+              <Glass variant="card" radius={22}>
+                <View style={styles.player}>
+                  <WebView
+                    originWhitelist={["*"]}
+                    source={{ html: videoHtml }}
+                    style={styles.webview}
+                    allowsInlineMediaPlayback
+                    mediaPlaybackRequiresUserAction={false}
+                    allowsFullscreenVideo
+                  />
+                </View>
+              </Glass>
+              <Pressable
+                onPress={() => {
+                  void selectionFeedback();
+                  void Linking.openURL(clip.videoUrl!);
+                }}
+                hitSlop={8}
+              >
+                <AppText variant="caption" style={{ color: colors.ink }}>
                   Open MP4 in browser
                 </AppText>
               </Pressable>
@@ -174,19 +184,23 @@ export function EvidenceScreen() {
 
           {clip.frames.length > 0 ? (
             <>
-              <AppText variant="caption">{clip.frames.length} stills</AppText>
+              <AppText variant="caption" style={{ marginTop: 4 }}>
+                {clip.frames.length} stills
+              </AppText>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
                 {clip.frames.map((frame) => (
-                  <View key={`${frame.at}-${frame.imageUrl}`} style={[styles.thumb, { borderColor: colors.line }]}>
-                    <Image
-                      source={{ uri: bustMediaUrl(frame.imageUrl, frame.at) }}
-                      style={styles.image}
-                      contentFit="cover"
-                    />
-                    <AppText variant="caption" style={{ paddingHorizontal: 6 }}>
-                      {clock(frame.at)}
-                    </AppText>
-                  </View>
+                  <Glass key={`${frame.at}-${frame.imageUrl}`} variant="card" radius={18}>
+                    <View style={styles.thumb}>
+                      <Image
+                        source={{ uri: bustMediaUrl(frame.imageUrl, frame.at) }}
+                        style={styles.image}
+                        contentFit="cover"
+                      />
+                      <AppText variant="caption" style={{ paddingHorizontal: 8, paddingVertical: 6 }}>
+                        {clock(frame.at)}
+                      </AppText>
+                    </View>
+                  </Glass>
                 ))}
               </ScrollView>
             </>
@@ -199,29 +213,21 @@ export function EvidenceScreen() {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 22,
-    borderWidth: 1,
     padding: 16,
     gap: 8,
-    marginBottom: 12,
   },
   stack: { gap: 10 },
   player: {
-    height: 240,
-    borderRadius: 18,
+    height: 248,
     overflow: "hidden",
-    borderWidth: 1,
     backgroundColor: "#000",
+    borderRadius: 22,
   },
   webview: { flex: 1, backgroundColor: "#000" },
   row: { gap: 10, paddingVertical: 4 },
   thumb: {
-    width: 140,
-    borderRadius: 16,
+    width: 148,
     overflow: "hidden",
-    borderWidth: 1,
-    gap: 4,
-    paddingBottom: 6,
   },
-  image: { width: "100%", height: 110 },
+  image: { width: "100%", height: 112 },
 });

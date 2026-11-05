@@ -1,11 +1,15 @@
 import { useMemo, type ReactNode } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { ChevronLeft } from "@/components/ui/icons";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useDockOffset } from "@/components/layout/DockTabBar";
 import { AppText } from "@/components/ui/AppText";
+import { Glass } from "@/components/ui/Glass";
+import { ScreenGradient } from "@/components/ui/ScreenGradient";
+import { useReduceMotion } from "@/hooks/useReduceMotion";
 import { useTheme } from "@/providers/ThemeProvider";
 
 type Props = {
@@ -30,16 +34,16 @@ export function Page({
   const insets = useSafeAreaInsets();
   const dock = useDockOffset();
   const { colors } = useTheme();
+  const reduceMotion = useReduceMotion();
   const styles = useMemo(
     () =>
       StyleSheet.create({
         fill: {
           flex: 1,
-          backgroundColor: colors.bg,
         },
         header: {
           paddingHorizontal: 20,
-          paddingBottom: 12,
+          paddingBottom: 14,
           flexDirection: "row",
           alignItems: "flex-end",
           justifyContent: "space-between",
@@ -48,59 +52,72 @@ export function Page({
         headerText: {
           flexDirection: "row",
           alignItems: "center",
-          gap: 10,
+          gap: 12,
           flex: 1,
         },
         flex: {
           flex: 1,
-          gap: 2,
+          gap: 3,
         },
-        back: {
-          width: 48,
-          height: 48,
-          borderRadius: 24,
+        backHit: {
+          width: 44,
+          height: 44,
+          borderRadius: 22,
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: colors.bgRaised,
-          borderWidth: 1,
-          borderColor: colors.line,
         },
       }),
-    [colors],
+    [],
   );
 
   return (
-    <View style={[styles.fill, { paddingTop: insets.top + 8 }]}>
+    <ScreenGradient style={[styles.fill, { paddingTop: insets.top + 6 }]}>
       <View style={styles.header}>
         <View style={styles.headerText}>
           {back ? (
-            <Pressable
-              accessibilityLabel="Go back"
-              onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}
-              style={styles.back}
-            >
-              <ChevronLeft size={18} color={colors.ink} strokeWidth={1.75} />
-            </Pressable>
+            <Glass variant="pill" radius={22}>
+              <Pressable
+                accessibilityLabel="Go back"
+                onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}
+                style={styles.backHit}
+              >
+                <ChevronLeft size={18} color={colors.ink} strokeWidth={1.85} />
+              </Pressable>
+            </Glass>
           ) : null}
           <View style={styles.flex}>
-            <AppText variant="title">{title}</AppText>
-            {subtitle ? <AppText variant="caption">{subtitle}</AppText> : null}
+            <AppText variant="title" numberOfLines={1}>
+              {title}
+            </AppText>
+            {subtitle ? (
+              <AppText variant="caption" numberOfLines={2}>
+                {subtitle}
+              </AppText>
+            ) : null}
           </View>
         </View>
         {action}
       </View>
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ paddingBottom: back ? insets.bottom + 28 : dock + 16, paddingHorizontal: 20 }}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          onRefresh ? (
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.signal} />
-          ) : undefined
-        }
+      <Animated.View
+        entering={reduceMotion ? undefined : FadeInDown.duration(360).springify().damping(18)}
+        style={{ flex: 1 }}
       >
-        {children}
-      </ScrollView>
-    </View>
+        <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={{
+            paddingBottom: back ? insets.bottom + 32 : dock + 18,
+            paddingHorizontal: 20,
+          }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            onRefresh ? (
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.inkMuted} />
+            ) : undefined
+          }
+        >
+          {children}
+        </ScrollView>
+      </Animated.View>
+    </ScreenGradient>
   );
 }

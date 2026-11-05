@@ -26,8 +26,8 @@ type HostRef = {
   measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) => void;
 };
 
-const INK = "#F5F6F7";
-const GLASS = "rgba(9,10,12,0.58)";
+const INK = "#F5F5F7";
+const GLASS = "rgba(28,28,30,0.62)";
 
 const VIEWS = [
   { id: "both", label: "Both" },
@@ -88,8 +88,9 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
   const watching = Boolean(videoSession);
   const speaking = Boolean(talkSession);
   const recordingNow = activeRecording?.status === "recording";
-  const driverH = Math.round(screenWidth / (watching ? WIDE : aspect.driver));
-  const cabinH = Math.round(screenWidth / (watching ? WIDE : aspect.cabin));
+  const stageWidth = Math.max(screenWidth - 40, 280);
+  const driverH = Math.round(stageWidth / (watching ? WIDE : aspect.driver));
+  const cabinH = Math.round(stageWidth / (watching ? WIDE : aspect.cabin));
   const showDriver = layout !== "cms";
   const showCabin = layout !== "dms";
   const stageHeight = (showDriver ? driverH : 0) + (showCabin ? cabinH : 0) + (showDriver && showCabin ? PANE_GAP : 0);
@@ -112,9 +113,7 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
       StyleSheet.create({
         wrap: { gap: 14 },
         stage: {
-          marginHorizontal: -20,
-          width: screenWidth,
-          borderRadius: 0,
+          borderRadius: 28,
           overflow: "hidden",
           backgroundColor: "#0C0D10",
         },
@@ -137,10 +136,12 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
         },
         switchTrack: {
           flexDirection: "row",
-          width: 232,
+          width: 240,
           padding: 3,
           borderRadius: 999,
           backgroundColor: GLASS,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: "rgba(255,255,255,0.12)",
         },
         switchItem: {
           flex: 1,
@@ -149,7 +150,7 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
           alignItems: "center",
           justifyContent: "center",
         },
-        switchOn: { backgroundColor: colors.lime },
+        switchOn: { backgroundColor: "#F5F5F7" },
         rail: {
           position: "absolute",
           top: 16,
@@ -166,8 +167,10 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
           alignItems: "center",
           justifyContent: "center",
           backgroundColor: GLASS,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: "rgba(255,255,255,0.12)",
         },
-        orbOn: { backgroundColor: colors.lime },
+        orbOn: { backgroundColor: "#F5F5F7" },
         orbDanger: { backgroundColor: colors.danger },
         watchSlot: {
           alignItems: "center",
@@ -180,10 +183,12 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
           alignItems: "center",
           gap: 8,
           backgroundColor: GLASS,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: "rgba(255,255,255,0.12)",
         },
         watchOn: { backgroundColor: colors.danger },
       }),
-    [colors.danger, colors.lime, screenWidth],
+    [colors.danger, screenWidth],
   );
 
   const boxStyle = useAnimatedStyle(() => ({
@@ -330,7 +335,7 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
                 }}
                 style={[styles.switchItem, selected && styles.switchOn]}
               >
-                <AppText variant="caption" style={{ color: selected ? colors.limeInk : INK, fontSize: 13 }}>
+                <AppText variant="caption" style={{ color: selected ? "#0A0A0C" : INK, fontSize: 13 }}>
                   {item.label}
                 </AppText>
               </Pressable>
@@ -387,7 +392,7 @@ export function CabinMediaBar({ reloadToken }: { reloadToken?: number }) {
               busy={busy === "listen"}
               active={listening}
               onPress={onListen}
-              icon={<Ear size={20} color={listening ? colors.limeInk : INK} strokeWidth={1.75} />}
+              icon={<Ear size={20} color={listening ? "#0A0A0C" : INK} strokeWidth={1.75} />}
               styles={styles}
             />
             <Orb
@@ -535,7 +540,7 @@ function Orb({
       style={({ pressed }) => [pressed && !busy && { opacity: 0.72 }, busy && { opacity: 0.55 }]}
     >
       <View style={[styles.orb, active && !danger && styles.orbOn, active && danger && styles.orbDanger]}>
-        {busy ? <ActivityIndicator color={active ? colors.limeInk : INK} /> : icon}
+        {busy ? <ActivityIndicator color={active ? "#0A0A0C" : INK} /> : icon}
       </View>
     </Pressable>
   );

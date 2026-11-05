@@ -16,7 +16,7 @@ export class MapErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.failed) {
       return (
-        <View style={{ flex: 1, backgroundColor: "#07080A", justifyContent: "center" }}>
+        <View style={{ flex: 1, backgroundColor: "#12151A", justifyContent: "center" }}>
           <ScreenState
             kind="error"
             title="The map did not open"

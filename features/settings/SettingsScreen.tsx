@@ -7,6 +7,7 @@ import * as Linking from "expo-linking";
 import { Page } from "@/components/layout/Page";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
+import { Glass } from "@/components/ui/Glass";
 import { Segmented } from "@/components/ui/Segmented";
 import { useTheme, type Appearance } from "@/providers/ThemeProvider";
 import { useRideStore } from "@/stores/useRideStore";
@@ -38,90 +39,105 @@ export function SettingsScreen() {
         : null;
 
   return (
-    <Page title="Settings" back>
-      <View style={styles.block}>
-        <AppText variant="strong">Appearance</AppText>
-        <Segmented
-          value={appearance}
-          onChange={(id) => setAppearance(id as Appearance)}
-          items={[
-            { id: "system", label: "System" },
-            { id: "light", label: "Light" },
-            { id: "dark", label: "Dark" },
-          ]}
-        />
-      </View>
-
-      <View style={[styles.group, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}>
-        <PermissionRow
-          title="Location"
-          body="Shows your phone on the map."
-          granted={Boolean(location?.granted)}
-          denied={locationDenied || location?.status === "denied"}
-          primary={primaryPermission === "location"}
-          lined={false}
-          onRequest={() => {
-            void requestLocation().then((result) => {
-              setLocationDenied(!result.granted);
-              if (result.granted) setShowDevice(true);
-            });
-          }}
-        />
-        <View style={[styles.row, styles.rowLine, { borderTopColor: colors.line }]}>
-          <AppText variant="body" style={styles.flex}>
-            Show my location dot
-          </AppText>
-          <Switch
-            value={showDevice}
-            disabled={!location?.granted}
-            onValueChange={setShowDevice}
-            trackColor={{ true: colors.lime, false: colors.bgSoft }}
-            thumbColor={colors.bgRaised}
+    <Page title="Settings" subtitle="Appearance · permissions · cabin" back>
+      <Glass variant="card" radius={22} style={{ marginBottom: 14 }}>
+        <View style={styles.block}>
+          <AppText variant="strong">Appearance</AppText>
+          <AppText variant="caption">Light and dark are equally polished.</AppText>
+          <Segmented
+            value={appearance}
+            onChange={(id) => setAppearance(id as Appearance)}
+            items={[
+              { id: "system", label: "System" },
+              { id: "light", label: "Light" },
+              { id: "dark", label: "Dark" },
+            ]}
           />
         </View>
-        <PermissionRow
-          title="Camera"
-          body="Only if you start a video call."
-          granted={Boolean(camera?.granted)}
-          denied={camera?.status === "denied"}
-          primary={primaryPermission === "camera"}
-          onRequest={() => void requestCamera()}
-        />
-        <PermissionRow
-          title="Microphone"
-          body="Only if you start a call."
-          granted={Boolean(microphone?.granted)}
-          denied={microphone?.status === "denied"}
-          primary={primaryPermission === "microphone"}
-          onRequest={() => void requestMicrophone()}
-        />
-      </View>
+      </Glass>
 
-      <View style={[styles.card, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}>
-        <View style={styles.toggleRow}>
-          <AppText variant="strong">Cabin monitoring</AppText>
-          <Switch
-            testID="cabin-consent"
-            value={consent}
-            onValueChange={setConsent}
-            trackColor={{ true: colors.lime, false: colors.bgSoft }}
-            thumbColor={colors.bgRaised}
+      <Glass variant="card" radius={24} style={{ marginBottom: 14 }}>
+        <View style={styles.group}>
+          <PermissionRow
+            title="Location"
+            body="Shows your phone on the map."
+            granted={Boolean(location?.granted)}
+            denied={locationDenied || location?.status === "denied"}
+            primary={primaryPermission === "location"}
+            lined={false}
+            onRequest={() => {
+              void requestLocation().then((result) => {
+                setLocationDenied(!result.granted);
+                if (result.granted) setShowDevice(true);
+              });
+            }}
+          />
+          <View style={[styles.row, styles.rowLine, { borderTopColor: colors.line }]}>
+            <AppText variant="body" style={[styles.flex, { color: colors.ink }]}>
+              Show my location dot
+            </AppText>
+            <Switch
+              value={showDevice}
+              disabled={!location?.granted}
+              onValueChange={setShowDevice}
+              trackColor={{ true: colors.primary, false: colors.bgSoft }}
+              thumbColor={colors.onPrimary}
+            />
+          </View>
+          <PermissionRow
+            title="Camera"
+            body="Only if you start a video call."
+            granted={Boolean(camera?.granted)}
+            denied={camera?.status === "denied"}
+            primary={primaryPermission === "camera"}
+            onRequest={() => void requestCamera()}
+          />
+          <PermissionRow
+            title="Microphone"
+            body="Only if you start a call."
+            granted={Boolean(microphone?.granted)}
+            denied={microphone?.status === "denied"}
+            primary={primaryPermission === "microphone"}
+            onRequest={() => void requestMicrophone()}
           />
         </View>
-      </View>
+      </Glass>
 
-      <View style={[styles.card, { backgroundColor: colors.bgRaised, borderColor: colors.line }]}>
-        <View style={styles.toggleRow}>
-          <AppText variant="body">Show offline state</AppText>
-          <Switch
-            testID="offline-override"
-            value={offline}
-            onValueChange={setOffline}
-            trackColor={{ true: colors.amber, false: colors.bgSoft }}
-            thumbColor={colors.bgRaised}
-          />
+      <Glass variant="card" radius={22} style={{ marginBottom: 14 }}>
+        <View style={styles.toggleCard}>
+          <View style={styles.toggleRow}>
+            <View style={styles.flex}>
+              <AppText variant="strong">Cabin monitoring</AppText>
+              <AppText variant="caption">Driver and cabin camera access</AppText>
+            </View>
+            <Switch
+              testID="cabin-consent"
+              value={consent}
+              onValueChange={setConsent}
+              trackColor={{ true: colors.primary, false: colors.bgSoft }}
+              thumbColor={colors.onPrimary}
+            />
+          </View>
         </View>
-      </View>
+      </Glass>
+
+      <Glass variant="card" radius={22} style={{ marginBottom: 14 }}>
+        <View style={styles.toggleCard}>
+          <View style={styles.toggleRow}>
+            <View style={styles.flex}>
+              <AppText variant="strong">Show offline state</AppText>
+              <AppText variant="caption">Force the offline banner for testing</AppText>
+            </View>
+            <Switch
+              testID="offline-override"
+              value={offline}
+              onValueChange={setOffline}
+              trackColor={{ true: colors.inkMuted, false: colors.bgSoft }}
+              thumbColor={colors.bgRaised}
+            />
+          </View>
+        </View>
+      </Glass>
 
       {!location?.granted && location?.canAskAgain === false ? (
         <Button label="Open system settings" tone="ghost" onPress={() => void Linking.openSettings()} />
@@ -153,7 +169,9 @@ function PermissionRow({
       <View style={styles.flex}>
         <AppText variant="strong">{title}</AppText>
         <AppText variant="caption">{body}</AppText>
-        <AppText variant="caption">{granted ? "Granted" : denied ? "Denied" : "Not requested"}</AppText>
+        <AppText variant="caption" style={{ color: granted ? colors.ink : colors.inkFaint }}>
+          {granted ? "Granted" : denied ? "Denied" : "Not requested"}
+        </AppText>
       </View>
       {denied && !granted ? (
         <Button label="Settings" tone="ghost" onPress={() => void Linking.openSettings()} />
@@ -170,12 +188,18 @@ function PermissionRow({
 }
 
 const styles = StyleSheet.create({
-  block: { gap: 10 },
-  group: { marginTop: 14, borderRadius: 22, borderWidth: 1, overflow: "hidden" },
-  card: { marginTop: 14, padding: 16, borderRadius: 22, borderWidth: 1, gap: 8 },
-  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
-  rowLine: { borderTopWidth: 1 },
+  block: { gap: 12, padding: 16 },
+  group: { overflow: "hidden" },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  rowLine: { borderTopWidth: StyleSheet.hairlineWidth },
   flex: { flex: 1, gap: 2 },
+  toggleCard: { padding: 16 },
   toggleRow: {
     flexDirection: "row",
     alignItems: "center",

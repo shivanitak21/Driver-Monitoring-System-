@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/ui/AppText";
+import { Glass } from "@/components/ui/Glass";
 import { CABIN_SEAT_SLOTS } from "@/constants/liveMap";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { Seat } from "@/types/domain";
@@ -22,21 +23,29 @@ export function SeatOccupancyGrid({ seats, awaitingWhenEmpty = false }: Props) {
           flexWrap: "wrap",
           gap: 10,
         },
-        seat: {
+        seatHost: {
           flexGrow: 1,
           flexBasis: "46%",
-          minHeight: 76,
-          borderRadius: 16,
-          paddingHorizontal: 14,
-          paddingVertical: 12,
-          justifyContent: "space-between",
-          backgroundColor: colors.bgRaised,
-          borderWidth: 1,
-          borderColor: colors.line,
         },
-        occupied: {
-          backgroundColor: colors.limeSoft,
-          borderColor: colors.lineStrong,
+        seat: {
+          minHeight: 84,
+          paddingHorizontal: 14,
+          paddingVertical: 14,
+          justifyContent: "space-between",
+          gap: 8,
+        },
+        occupiedDot: {
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: colors.ink,
+        },
+        emptyDot: {
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: colors.inkFaint,
+          opacity: 0.5,
         },
       }),
     [colors],
@@ -66,16 +75,29 @@ export function SeatOccupancyGrid({ seats, awaitingWhenEmpty = false }: Props) {
   return (
     <View style={styles.grid}>
       {rows.map((seat) => (
-        <View key={seat.id} style={[styles.seat, seat.occupied && styles.occupied]}>
-          <AppText variant="caption" style={{ color: colors.inkMuted }}>
-            {seat.label}
-          </AppText>
-          <AppText
-            variant="strong"
-            style={{ color: seat.occupied ? colors.signal : seat.muted ? colors.inkFaint : colors.ink }}
+        <View key={seat.id} style={styles.seatHost}>
+          <Glass
+            variant="card"
+            radius={20}
           >
-            {seat.value}
-          </AppText>
+            <View style={styles.seat}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <AppText variant="caption" style={{ color: colors.inkMuted }}>
+                  {seat.label}
+                </AppText>
+                <View style={seat.occupied ? styles.occupiedDot : styles.emptyDot} />
+              </View>
+              <AppText
+                variant="strong"
+                style={{
+                  color: seat.muted ? colors.inkFaint : colors.ink,
+                  fontSize: 18,
+                }}
+              >
+                {seat.value}
+              </AppText>
+            </View>
+          </Glass>
         </View>
       ))}
     </View>

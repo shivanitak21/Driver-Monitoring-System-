@@ -6,6 +6,7 @@ import { AlertTimelineItem } from "@/components/alerts/AlertTimelineItem";
 import { Page } from "@/components/layout/Page";
 import { ApiStatusBanner } from "@/components/system/ApiStatusBanner";
 import { AppText } from "@/components/ui/AppText";
+import { Glass } from "@/components/ui/Glass";
 import { ScreenState } from "@/components/ui/ScreenState";
 import { Segmented } from "@/components/ui/Segmented";
 import { useOffline } from "@/components/system/OfflineBanner";
@@ -16,6 +17,7 @@ import { useTheme } from "@/providers/ThemeProvider";
 import { useRideStore } from "@/stores/useRideStore";
 import type { MediaChannel } from "@/types/domain";
 import { hasAlertClip } from "@/utils/alerts";
+import { selectionFeedback } from "@/utils/haptics";
 
 const statusFilters = [
   { id: "all", label: "All" },
@@ -88,7 +90,7 @@ export function AlertsScreen() {
   return (
     <Page
       title="Alerts"
-          subtitle={
+      subtitle={
         liveMode
           ? `${openCount} open · ${listed.length} with a clip`
           : openCount > 0
@@ -100,6 +102,7 @@ export function AlertsScreen() {
       action={
         <Pressable
           onPress={() => {
+            void selectionFeedback();
             setBusy(true);
             setActionError(null);
             void acknowledgeAll()
@@ -109,8 +112,15 @@ export function AlertsScreen() {
           accessibilityRole="button"
           hitSlop={8}
           disabled={busy || openCount === 0}
+            style={[
+            styles.clear,
+            {
+              backgroundColor: colors.bgSoft,
+              opacity: busy || openCount === 0 ? 0.55 : 1,
+            },
+          ]}
         >
-          <AppText variant="caption" style={{ color: openCount === 0 ? colors.inkFaint : colors.signal }}>
+          <AppText variant="caption" style={{ color: openCount === 0 ? colors.inkFaint : colors.ink }}>
             Clear
           </AppText>
         </Pressable>
@@ -132,12 +142,13 @@ export function AlertsScreen() {
         </AppText>
       ) : null}
 
-      <View style={styles.filters}>
-        <Segmented items={statusFilters} value={filter} onChange={onFilterChange} />
-      </View>
-      <View style={styles.filters}>
-        <Segmented items={channelFilters} value={channel} onChange={onChannelChange} />
-      </View>
+      <Glass variant="card" radius={20} style={{ marginBottom: 12 }}>
+        <View style={styles.filterBlock}>
+          <Segmented items={statusFilters} value={filter} onChange={onFilterChange} />
+          <View style={{ height: 10 }} />
+          <Segmented items={channelFilters} value={channel} onChange={onChannelChange} />
+        </View>
+      </Glass>
 
       {visible.length === 0 ? (
         <ScreenState
@@ -184,5 +195,10 @@ export function AlertsScreen() {
 const styles = StyleSheet.create({
   offline: { marginBottom: 8 },
   banner: { marginBottom: 10 },
-  filters: { marginBottom: 12 },
+  filterBlock: { padding: 10 },
+  clear: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
 });

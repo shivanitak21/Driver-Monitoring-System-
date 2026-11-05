@@ -17,10 +17,11 @@ const labelFor: Record<SafetyStatus, string> = {
   emergency: "Emergency",
 };
 
+/** Mostly monochrome; only emergency uses red. */
 export function statusColor(colors: Palette, status: SafetyStatus) {
   if (status === "emergency") return colors.danger;
-  if (status === "caution") return colors.amber;
-  return colors.signal;
+  if (status === "caution") return colors.inkMuted;
+  return colors.ink;
 }
 
 export function ScoreRing({
@@ -69,30 +70,36 @@ export function ScoreRing({
   );
 
   return (
-    <View style={{ width: caption ? 84 : size, alignItems: "center" }} accessibilityLabel={`Safety score ${index}, ${labelFor[status]}`}>
+    <View
+      style={{ width: caption ? 84 : size, alignItems: "center" }}
+      accessibilityLabel={`Safety score ${index}, ${labelFor[status]}`}
+    >
       <View style={{ width: size, height: size }}>
-      <Svg width={size} height={size}>
-        <Circle cx={center} cy={center} r={radius} stroke={colors.lineStrong} strokeWidth={stroke} fill="none" />
-        <AnimatedCircle
-          cx={center}
-          cy={center}
-          r={radius}
-          stroke={color}
-          strokeWidth={stroke}
-          fill="none"
-          animatedProps={animatedProps}
-          strokeDashoffset={circumference * 0.25}
-          strokeLinecap="round"
-        />
-      </Svg>
-      <View style={styles.center}>
-        <AppText variant="strong" style={styles.value}>
-          {index}
-        </AppText>
-      </View>
+        <Svg width={size} height={size}>
+          <Circle cx={center} cy={center} r={radius} stroke={colors.lineStrong} strokeWidth={stroke} fill="none" />
+          <AnimatedCircle
+            cx={center}
+            cy={center}
+            r={radius}
+            stroke={color}
+            strokeWidth={stroke}
+            fill="none"
+            animatedProps={animatedProps}
+            strokeDashoffset={circumference * 0.25}
+            strokeLinecap="round"
+          />
+        </Svg>
+        <View style={styles.center}>
+          <AppText variant="strong" style={styles.value}>
+            {index}
+          </AppText>
+        </View>
       </View>
       {caption ? (
-        <AppText variant="label" style={{ marginTop: 4, textAlign: "center", color: colors.inkMuted, lineHeight: 14 }}>
+        <AppText
+          variant="label"
+          style={{ marginTop: 4, textAlign: "center", color: colors.inkMuted, lineHeight: 14, fontSize: 10 }}
+        >
           {caption}
         </AppText>
       ) : null}
@@ -103,6 +110,9 @@ export function ScoreRing({
 export function StatusPill({ status }: { status: SafetyStatus }) {
   const { colors } = useTheme();
   const color = statusColor(colors, status);
+  const soft =
+    status === "emergency" ? "rgba(255,69,58,0.12)" : colors.bgSoft;
+
   return (
     <View
       style={{
@@ -112,11 +122,13 @@ export function StatusPill({ status }: { status: SafetyStatus }) {
         borderRadius: 999,
         paddingHorizontal: 10,
         paddingVertical: 6,
-        backgroundColor: colors.bgSoft,
+        backgroundColor: soft,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: colors.line,
       }}
     >
       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
-      <AppText variant="caption" style={{ color }}>
+      <AppText variant="caption" style={{ color, fontSize: 12 }}>
         {labelFor[status]}
       </AppText>
     </View>

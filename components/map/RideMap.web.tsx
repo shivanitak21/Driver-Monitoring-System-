@@ -7,7 +7,7 @@ import { KeyedRideMap } from "@/components/map/KeyedRideMap";
 import type { RideMapProps } from "@/components/map/types";
 import { useSmoothPose } from "@/components/map/useSmoothPose";
 import { AppText } from "@/components/ui/AppText";
-import { googleMapsApiKey } from "@/constants/maps";
+import { mapboxAccessToken } from "@/constants/maps";
 import { useReduceMotion } from "@/hooks/useReduceMotion";
 import { useTheme } from "@/providers/ThemeProvider";
 import type { Coordinate } from "@/types/domain";
@@ -24,8 +24,8 @@ function boundsOf(points: Coordinate[]) {
 }
 
 export function RideMap(props: RideMapProps) {
-  const apiKey = googleMapsApiKey();
-  if (apiKey) return <KeyedRideMap {...props} apiKey={apiKey} />;
+  const token = mapboxAccessToken();
+  if (token) return <KeyedRideMap {...props} apiKey={token} />;
   return <PreviewMap {...props} />;
 }
 
@@ -87,7 +87,7 @@ function PreviewMap({ route, trail, position, heading, destination, deviceFix, o
         <CarGlyph width={52} height={52} />
       </Pressable>
       <View style={styles.caption} pointerEvents="none">
-        <AppText variant="caption">Route preview on web. iOS uses Apple Maps. Android uses Google Maps.</AppText>
+        <AppText variant="caption">Route preview on web. Set EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN for Mapbox.</AppText>
       </View>
     </View>
   );

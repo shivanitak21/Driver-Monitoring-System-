@@ -1,8 +1,10 @@
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/ui/AppText";
+import { Glass } from "@/components/ui/Glass";
 import { useTheme } from "@/providers/ThemeProvider";
 import { useRideStore } from "@/stores/useRideStore";
+import { selectionFeedback } from "@/utils/haptics";
 
 export function ApiStatusBanner({ onRetry }: { onRetry?: () => void }) {
   const liveMode = useRideStore((state) => state.liveMode);
@@ -23,40 +25,53 @@ export function ApiStatusBanner({ onRetry }: { onRetry?: () => void }) {
           : "API notice";
 
   return (
-    <View
-      style={[styles.banner, { borderColor: colors.line, backgroundColor: colors.glass }]}
-      testID="api-status-banner"
-    >
-      <View style={styles.copy}>
-        <AppText variant="strong" style={{ fontSize: 13 }}>
-          {title}
-        </AppText>
-        {connectionError ? (
-          <AppText variant="caption" numberOfLines={3}>
-            {connectionError}
+    <Glass variant="card" radius={18}>
+      <View style={styles.banner} testID="api-status-banner">
+        <View style={styles.copy}>
+          <AppText variant="strong" style={{ fontSize: 13 }}>
+            {title}
           </AppText>
+          {connectionError ? (
+            <AppText variant="caption" numberOfLines={3}>
+              {connectionError}
+            </AppText>
+          ) : null}
+        </View>
+        {onRetry ? (
+          <Pressable
+            onPress={() => {
+              void selectionFeedback();
+              onRetry();
+            }}
+            accessibilityRole="button"
+            hitSlop={8}
+            style={[styles.retry, { backgroundColor: colors.bgSoft }]}
+          >
+            <AppText variant="caption" style={{ color: colors.ink }}>
+              Retry
+            </AppText>
+          </Pressable>
         ) : null}
       </View>
-      {onRetry ? (
-        <Pressable onPress={onRetry} accessibilityRole="button" hitSlop={8}>
-          <AppText variant="caption" style={{ color: colors.signal }}>
-            Retry
-          </AppText>
-        </Pressable>
-      ) : null}
-    </View>
+    </Glass>
   );
 }
 
 const styles = StyleSheet.create({
   banner: {
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
   },
-  copy: { flex: 1, gap: 2 },
+  copy: {
+    flex: 1,
+    gap: 2,
+  },
+  retry: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
 });

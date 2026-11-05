@@ -23,6 +23,7 @@ export function TripsScreen() {
   return (
     <Page
       title="Trips"
+      subtitle={liveMode ? "Past rides for this device" : undefined}
       refreshing={refreshing}
       onRefresh={
         liveMode
@@ -30,7 +31,7 @@ export function TripsScreen() {
           : undefined
       }
     >
-      <View style={{ marginBottom: 10 }}>
+      <View style={{ marginBottom: 12 }}>
         <ApiStatusBanner onRetry={() => void refreshAll()} />
       </View>
 
@@ -38,33 +39,35 @@ export function TripsScreen() {
         history.length === 0 ? (
           <ScreenState kind="empty" title="No past rides" />
         ) : (
-          history.map((trip) => (
-              <TripHistoryCard
-                key={historyTripKey(trip)}
-                title={trip.passenger || trip.id}
-                meta={[
-                  trip.status,
-                  trip.startedAt ? rideDate(trip.startedAt) : null,
-                  `score ${trip.score}`,
-                  `${trip.alertCount} alerts`,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-                status={trip.safetyStatus}
-                onPress={() => {
-                  const qs =
-                    trip.startedAt != null
-                      ? `?startedAt=${encodeURIComponent(String(trip.startedAt))}`
-                      : "";
-                  router.push(`/trip/${trip.id}${qs}`);
-                }}
-              />
-            ))
+          history.map((trip, index) => (
+            <TripHistoryCard
+              key={historyTripKey(trip)}
+              index={index}
+              title={trip.passenger || trip.id}
+              meta={[
+                trip.status,
+                trip.startedAt ? rideDate(trip.startedAt) : null,
+                `score ${trip.score}`,
+                `${trip.alertCount} alerts`,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+              status={trip.safetyStatus}
+              onPress={() => {
+                const qs =
+                  trip.startedAt != null
+                    ? `?startedAt=${encodeURIComponent(String(trip.startedAt))}`
+                    : "";
+                router.push(`/trip/${trip.id}${qs}`);
+              }}
+            />
+          ))
         )
       ) : (
-        pastTrips.map((trip) => (
+        pastTrips.map((trip, index) => (
           <TripHistoryCard
             key={trip.id}
+            index={index}
             title={trip.destinationLabel}
             meta={`${trip.distanceKm.toFixed(1)} km`}
             status={trip.safetyStatus}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 
@@ -6,6 +6,7 @@ import { Page } from "@/components/layout/Page";
 import { RideMap } from "@/components/map/RideMap";
 import { StatusChip } from "@/components/system/StatusChip";
 import { AppText } from "@/components/ui/AppText";
+import { Glass } from "@/components/ui/Glass";
 import { ScreenState } from "@/components/ui/ScreenState";
 import { StatusPill } from "@/components/ui/ScoreRing";
 import { clock, rideDate } from "@/constants/format";
@@ -15,6 +16,7 @@ import { services } from "@/services/createServices";
 import { useRideStore } from "@/stores/useRideStore";
 import type { RideDto } from "@/services/api/types";
 import type { Coordinate } from "@/types/domain";
+import { selectionFeedback } from "@/utils/haptics";
 
 function usableRoute(points: Coordinate[] | null | undefined): Coordinate[] {
   if (!points?.length) return [];
@@ -104,21 +106,23 @@ export function TripDetailScreen() {
   if (!liveMode && past) {
     return (
       <Page title={past.destinationLabel} subtitle={rideDate(past.startedAt)} back action={<StatusPill status={past.safetyStatus} />}>
-        <View style={[styles.map, { borderColor: colors.line, backgroundColor: colors.mapBg }]}>
-          <RideMap
-            route={past.route}
-            trail={past.route}
-            position={past.position}
-            heading={past.heading}
-            destination={past.route[past.route.length - 1]}
-            origin={past.route[0]}
-            follow={false}
-            deviceFix={null}
-            onPan={() => undefined}
-            onPressVehicle={() => undefined}
-          />
-        </View>
-        <AppText variant="caption" style={{ marginTop: 12 }}>
+        <Glass variant="card" radius={28}>
+          <View style={[styles.map, { backgroundColor: colors.mapBg }]}>
+            <RideMap
+              route={past.route}
+              trail={past.route}
+              position={past.position}
+              heading={past.heading}
+              destination={past.route[past.route.length - 1]}
+              origin={past.route[0]}
+              follow={false}
+              deviceFix={null}
+              onPan={() => undefined}
+              onPressVehicle={() => undefined}
+            />
+          </View>
+        </Glass>
+        <AppText variant="caption" style={{ marginTop: 14 }}>
           {past.distanceKm.toFixed(1)} km · offline copy on this phone
         </AppText>
       </Page>
@@ -164,42 +168,52 @@ export function TripDetailScreen() {
       {historyLoading ? <ScreenState kind="loading" title="Loading route" /> : null}
       {historyError ? <ScreenState kind="error" title="Route failed" body={historyError} /> : null}
 
-      <View style={[styles.map, { borderColor: colors.line, backgroundColor: colors.mapBg }]}>
-        {mapPosition ? (
-          <RideMap
-            route={drawLine ? routePoints : []}
-            trail={drawLine ? routePoints : []}
-            position={mapPosition}
-            heading={0}
-            destination={drawLine ? routePoints[routePoints.length - 1] : null}
-            origin={origin}
-            follow={false}
-            deviceFix={null}
-            onPan={() => undefined}
-            onPressVehicle={() => undefined}
-          />
-        ) : (
-          <View style={styles.mapEmpty}>
-            <AppText variant="caption">No GPS for this trip</AppText>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.meta}>
-        <View style={styles.chips}>
-          <StatusChip
-            label={historyRideDetail?.status || historyRide.status}
-            tone={(historyRideDetail?.status || historyRide.status) === "active" ? "ok" : "muted"}
-          />
-          <StatusChip label={`score ${historyRideDetail?.score ?? historyRide.score}`} tone="muted" />
-          <StatusChip label={`${historyRide.alertCount} alerts`} tone="muted" />
+      <Glass variant="card" radius={28}>
+        <View style={[styles.map, { backgroundColor: colors.mapBg }]}>
+          {mapPosition ? (
+            <RideMap
+              route={drawLine ? routePoints : []}
+              trail={drawLine ? routePoints : []}
+              position={mapPosition}
+              heading={0}
+              destination={drawLine ? routePoints[routePoints.length - 1] : null}
+              origin={origin}
+              follow={false}
+              deviceFix={null}
+              onPan={() => undefined}
+              onPressVehicle={() => undefined}
+            />
+          ) : (
+            <View style={styles.mapEmpty}>
+              <AppText variant="caption">No GPS for this trip</AppText>
+            </View>
+          )}
         </View>
-        <Pressable onPress={() => router.push("/alerts")} hitSlop={8}>
-          <AppText variant="caption" style={{ color: colors.signal }}>
-            View events on Alerts
-          </AppText>
-        </Pressable>
-      </View>
+      </Glass>
+
+      <Glass variant="card" radius={22} style={{ marginTop: 14 }}>
+        <View style={styles.meta}>
+          <View style={styles.chips}>
+            <StatusChip
+              label={historyRideDetail?.status || historyRide.status}
+              tone={(historyRideDetail?.status || historyRide.status) === "active" ? "ok" : "muted"}
+            />
+            <StatusChip label={`score ${historyRideDetail?.score ?? historyRide.score}`} tone="muted" />
+            <StatusChip label={`${historyRide.alertCount} alerts`} tone="muted" />
+          </View>
+          <Pressable
+            onPress={() => {
+              void selectionFeedback();
+              router.push("/alerts");
+            }}
+            hitSlop={8}
+          >
+            <AppText variant="strong" style={{ color: colors.ink, fontSize: 15 }}>
+              View events on Alerts
+            </AppText>
+          </Pressable>
+        </View>
+      </Glass>
     </Page>
   );
 }
@@ -211,30 +225,30 @@ function LinkRow({
 }: {
   label: string;
   onPress: () => void;
-  colors: { signal: string; line: string };
+  colors: { ink: string; line: string; bgRaised: string };
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        paddingVertical: 14,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: colors.line,
-      }}
-    >
-      <AppText variant="strong" style={{ color: colors.signal }}>
-        {label}
-      </AppText>
-    </Pressable>
+    <Glass variant="card" radius={18} style={{ marginBottom: 10 }}>
+      <Pressable
+        onPress={() => {
+          void selectionFeedback();
+          onPress();
+        }}
+        style={{ paddingVertical: 16, paddingHorizontal: 16 }}
+      >
+        <AppText variant="strong" style={{ color: colors.ink }}>
+          {label}
+        </AppText>
+      </Pressable>
+    </Glass>
   );
 }
 
 const styles = StyleSheet.create({
   map: {
-    height: 280,
-    borderRadius: 22,
+    height: 300,
     overflow: "hidden",
-    borderWidth: 1,
+    borderRadius: 28,
   },
   mapEmpty: {
     flex: 1,
@@ -242,8 +256,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   meta: {
-    marginTop: 16,
-    gap: 12,
+    padding: 16,
+    gap: 14,
   },
   chips: {
     flexDirection: "row",

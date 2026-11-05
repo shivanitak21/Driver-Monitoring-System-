@@ -1,21 +1,20 @@
 import { useEffect, useRef } from "react";
 import { Platform, StyleSheet, View } from "react-native";
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Marker, Polyline } from "react-native-maps";
 
 import { CarGlyph } from "@/components/map/CarGlyph";
 import { KeyedRideMap } from "@/components/map/KeyedRideMap";
 import type { RideMapProps } from "@/components/map/types";
 import { useSmoothPose } from "@/components/map/useSmoothPose";
-import { googleMapsApiKey } from "@/constants/maps";
-import { darkMapStyle, lightMapStyle } from "@/constants/mapStyle";
+import { mapboxAccessToken } from "@/constants/maps";
 import { useReduceMotion } from "@/hooks/useReduceMotion";
 import { useTheme } from "@/providers/ThemeProvider";
 
 export function RideMap(props: RideMapProps) {
-  const apiKey = googleMapsApiKey();
-  // A release APK has no Expo Go maps key. Creating the native Google map
-  // without com.google.android.geo.API_KEY aborts the process on launch.
-  if (apiKey || Platform.OS === "android") return <KeyedRideMap {...props} apiKey={apiKey} />;
+  const token = mapboxAccessToken();
+  // Android (and any build with a Mapbox token) uses the WebView Mapbox / tile map.
+  // iOS without a token keeps the native Apple Maps path.
+  if (token || Platform.OS === "android") return <KeyedRideMap {...props} apiKey={token} />;
   return <NativeRideMap {...props} />;
 }
 
@@ -64,14 +63,12 @@ function NativeRideMap({
     <MapView
       ref={mapRef}
       style={StyleSheet.absoluteFill}
-      provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
       initialRegion={{
         latitude: position.latitude,
         longitude: position.longitude,
         latitudeDelta: 0.04,
         longitudeDelta: 0.04,
       }}
-      customMapStyle={Platform.OS === "android" ? (scheme === "light" ? lightMapStyle : darkMapStyle) : undefined}
       userInterfaceStyle={scheme}
       mapType={Platform.OS === "ios" ? "mutedStandard" : "standard"}
       showsCompass={false}
@@ -91,7 +88,13 @@ function NativeRideMap({
           strokeWidth={3}
         />
       ) : null}
-      {trail.length > 1 ? <Polyline coordinates={trail} strokeColor={colors.signal} strokeWidth={4} /> : null}
+      {trail.length > 1 ? (
+        <Polyline
+          coordinates={trail}
+          strokeColor={scheme === "light" ? "#1C1C1E" : "#F5F5F7"}
+          strokeWidth={4}
+        />
+      ) : null}
       {origin ? (
         <Marker coordinate={origin} anchor={{ x: 0.5, y: 0.5 }}>
           <View style={[styles.origin, { backgroundColor: colors.inkFaint, borderColor: colors.bg }]} />
@@ -99,7 +102,7 @@ function NativeRideMap({
       ) : null}
       {destination ? (
         <Marker coordinate={destination} anchor={{ x: 0.5, y: 0.5 }}>
-          <View style={[styles.destination, { backgroundColor: colors.cyan, borderColor: colors.bg }]} />
+          <View style={[styles.destination, { backgroundColor: colors.ink, borderColor: colors.bg }]} />
         </Marker>
       ) : null}
       {deviceFix ? (

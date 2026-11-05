@@ -1,6 +1,7 @@
 import type { ExpoConfig } from "expo/config";
 
-const mapsKey = process.env.GOOGLE_MAPS_API_KEY;
+const mapboxToken =
+  (process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || process.env.MAPBOX_ACCESS_TOKEN || "").trim();
 
 const plugins: ExpoConfig["plugins"] = [
   "expo-router",
@@ -43,16 +44,6 @@ const plugins: ExpoConfig["plugins"] = [
   ],
 ];
 
-if (mapsKey) {
-  plugins.push([
-    "react-native-maps",
-    {
-      androidGoogleMapsApiKey: mapsKey,
-      iosGoogleMapsApiKey: mapsKey,
-    },
-  ]);
-}
-
 const config: ExpoConfig = {
   name: "VMS",
   slug: "vms",
@@ -61,7 +52,7 @@ const config: ExpoConfig = {
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "dark",
-  backgroundColor: "#07080A",
+  backgroundColor: "#000000",
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.vms.safety",
@@ -87,7 +78,7 @@ const config: ExpoConfig = {
       "android.permission.ACCESS_NETWORK_STATE",
     ],
     adaptiveIcon: {
-      backgroundColor: "#07080A",
+      backgroundColor: "#000000",
       foregroundImage: "./assets/android-icon-foreground.png",
       backgroundImage: "./assets/android-icon-background.png",
       monochromeImage: "./assets/android-icon-monochrome.png",
@@ -108,7 +99,7 @@ const config: ExpoConfig = {
     // Demo guardian API. Override with EXPO_PUBLIC_TELEMETRY_URL when needed.
     telemetryUrl: (process.env.EXPO_PUBLIC_TELEMETRY_URL || "http://51.81.81.118:8000").trim(),
     mqttUrl: (process.env.EXPO_PUBLIC_MQTT_URL ?? "").trim(),
-    googleMapsApiKey: mapsKey ?? "",
+    mapboxAccessToken: mapboxToken,
     defaultRideId: process.env.EXPO_PUBLIC_RIDE_ID || "ride-1842",
     defaultDeviceId: process.env.EXPO_PUBLIC_DEVICE_ID || "orin-nano-01",
   },
